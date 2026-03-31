@@ -1,0 +1,29 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing: border-box;
+}
+#canvas1 {
+    position: absolute;
+    background:green ;
+    border: 5px solid black;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    height: 100vh;
+
+}
+#farmer{
+    display:none;
+
+}
+
+#mobile-controls{
+    display: none; 
+    position: fixed; 
+    bottom: 20px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+    z-index: 10;
+}
