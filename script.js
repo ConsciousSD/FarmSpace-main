@@ -30,6 +30,7 @@ const tireSprite = new Image(); tireSprite.src = "assets/Wheel.png";
 const ak47Idle = new Image(); ak47Idle.src = "assets/AK47.png";
 const ak47Shooting = new Image(); ak47Shooting.src = "assets/AK47-shooting.png";
 const enemyDeathSprite = new Image(); enemyDeathSprite.src = "assets/Poltra-gets-shot.png";
+const corralSprite = new Image(); corralSprite.src = 'assets/corral.png';
 
 // --- GAME STATE ---
 let playerX = 1250, playerY = 1250;
@@ -39,6 +40,14 @@ let frameX = 0, frameY = 0;
 let seedInventory = 0, enemyKillScore = 0, ammo = 0;
 let hasGun = false, gunCoolDownActive = false, killsSinceEmpty = 0;
 let isPowered = false, powerTimer = 0, isPaused = false;
+const corral = {
+    x: 20, // A small offset from the left edge
+    y: (CANVAS_HEIGHT / 2) - 150, // Centered vertically
+    width: 300, // Scaled up from 64 so it's visible on your 2500px canvas
+    height: 300,
+    hitboxOffsetX: 20,
+    hitboxOffsetY: 20
+};
 
 const enemies = [], seeds = [], plantedWatermelons = [], tires = [], guns = [];
 
@@ -107,12 +116,12 @@ function createEnemy(type = 1) {
     let ex, ey;
     do { ex = Math.random() * 2200; ey = Math.random() * 2200; } while (Math.hypot(playerX - ex, playerY - ey) < 700);
     let img = type === 1 ? enemySprite : (type === 2 ? enemySprite2 : enemySprite3);
-    return { 
-        x: ex, y: ey, type, img, 
-        width: 288, height: type === 2 ? 432 : 288, 
-        speed: type === 1 ? 2 : (type === 2 ? 2.4 : 3.5), 
+    return {
+        x: ex, y: ey, type, img,
+        width: 288, height: type === 2 ? 432 : 288,
+        speed: type === 1 ? 2 : (type === 2 ? 2.4 : 3.5),
         fIdx: 0, fT: 0, hitboxOffsetX: 90, hitboxOffsetY: 90,
-        isDying: false, deathFrame: 0, deathTimer: 0 
+        isDying: false, deathFrame: 0, deathTimer: 0
     };
 }
 
@@ -138,7 +147,8 @@ function gameLoop() {
     if (isPaused) return requestAnimationFrame(gameLoop);
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     gameFrame++;
-
+    // --- DRAW CORRAL ---
+    ctx.drawImage(corralSprite, corral.x, corral.y, corral.width, corral.height);
     // 1. TRACTOR EXPIRATION
     if (isPowered && Date.now() - powerTimer > 10000) { isPowered = false; }
 
@@ -151,9 +161,10 @@ function gameLoop() {
     isMoving = (moveLeft || moveRight || moveUp || moveDown);
     if (isMoving) moveSound.play(); else moveSound.pause();
 
+
     player.update();
     player.draw(ctx);
-
+    
     // 3. PICKUPS (Guns, Seeds, Tires)
     guns.forEach((g, i) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 600, 600);
@@ -202,7 +213,7 @@ function gameLoop() {
             }
 
             // Hit Detection
-            if (hasGun && isShooting && Math.abs((en.y + (en.height/2)) - (playerY + 144)) < 150) {
+            if (hasGun && isShooting && Math.abs((en.y + (en.height / 2)) - (playerY + 144)) < 150) {
                 let pDx = en.x - playerX;
                 if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0)) && gameFrame % 15 === 0) {
                     en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; enemyKillScore++;
@@ -243,10 +254,10 @@ function gameLoop() {
     } else if (enemyKillScore < 5) {
         ctx.fillStyle = 'gray'; ctx.fillText(`GUN LOCKED: ${enemyKillScore}/5`, 30, 210);
     }
-    if (isPowered) { 
-        ctx.fillStyle = 'yellow'; 
+    if (isPowered) {
+        ctx.fillStyle = 'yellow';
         let rem = Math.max(0, Math.ceil((10000 - (Date.now() - powerTimer)) / 1000));
-        ctx.fillText(`TRACTOR: ${rem}s`, 350, 60); 
+        ctx.fillText(`TRACTOR: ${rem}s`, 350, 60);
     }
 
     requestAnimationFrame(gameLoop);
@@ -287,22 +298,22 @@ startButton.addEventListener('click', () => {
 
     // 4. Start Spawning System
     spawnTick();
-    
+
     // 5. Start Item Intervals
-    setInterval(() => { 
-        if (seeds.length < 5) seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); 
+    setInterval(() => {
+        if (seeds.length < 5) seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 });
     }, 12000);
-    
-    setInterval(() => { 
-        if (tires.length < 1) tires.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); 
+
+    setInterval(() => {
+        if (tires.length < 1) tires.push({ x: Math.random() * 2200, y: Math.random() * 2200 });
     }, 75000);
-    
-    setInterval(() => { 
+
+    setInterval(() => {
         if (enemyKillScore >= 5 && !hasGun && !gunCoolDownActive && guns.length === 0) {
             guns.push({ x: Math.random() * 2000, y: Math.random() * 2000 });
         }
     }, 4000);
-    
+
     // 6. Launch the Game Loop
     gameLoop();
 });
