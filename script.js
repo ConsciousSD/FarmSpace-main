@@ -263,12 +263,51 @@ function spawnTick() {
     else if (enemyKillScore >= 20 && c3 < 4) enemies.push(createEnemy(3));
     setTimeout(spawnTick, 3000 * spawnRateMultiplier);
 }
+// --- MOBILE DETECTION ---
+function isMobile() {
+    return /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+}
 
-// --- START ---
-playerImage.onload = () => {
+// --- START SCREEN & INITIALIZATION ---
+const startButton = document.getElementById('start-button');
+const startScreen = document.getElementById('start-screen');
+const mobileControls = document.getElementById('mobile-controls');
+
+startButton.addEventListener('click', () => {
+    // 1. Hide the menu
+    startScreen.style.display = 'none';
+
+    // 2. Show mobile controls ONLY if on a mobile device
+    if (isMobile() && mobileControls) {
+        mobileControls.style.display = 'block';
+    }
+
+    // 3. Start Audio (Browsers require a click to play sound)
+    gameAudio.play().catch(e => console.log("Audio play blocked or failed", e));
+
+    // 4. Start Spawning System
     spawnTick();
-    setInterval(() => { if (seeds.length < 5) seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 12000);
-    setInterval(() => { if (tires.length < 1) tires.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 75000);
-    setInterval(() => { if (enemyKillScore >= 5 && !hasGun && !gunCoolDownActive && guns.length === 0) guns.push({ x: Math.random() * 2000, y: Math.random() * 2000 }); }, 4000);
+    
+    // 5. Start Item Intervals
+    setInterval(() => { 
+        if (seeds.length < 5) seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); 
+    }, 12000);
+    
+    setInterval(() => { 
+        if (tires.length < 1) tires.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); 
+    }, 75000);
+    
+    setInterval(() => { 
+        if (enemyKillScore >= 5 && !hasGun && !gunCoolDownActive && guns.length === 0) {
+            guns.push({ x: Math.random() * 2000, y: Math.random() * 2000 });
+        }
+    }, 4000);
+    
+    // 6. Launch the Game Loop
     gameLoop();
+});
+
+// We keep this to ensure the image is ready, but we don't start the loop here anymore
+playerImage.onload = () => {
+    console.log("Farm Space assets loaded. Standing by for start...");
 };

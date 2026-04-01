@@ -27,3 +27,37 @@
     transform: translateX(-50%); 
     z-index: 10;
 }
+#start-screen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    
+    /* This ensures it stays on top of the green canvas */
+    z-index: 20; 
+    
+    /* Styling the menu box */
+    background: rgba(0, 0, 0, 0.8);
+    padding: 50px;
+    border-radius: 20px;
+    border: 3px solid white;
+    text-align: center;
+    color: white;
+    font-family: 'Courier New', Courier, monospace; /* Farm-style font */
+}
+
+#start-button {
+    margin-top: 20px;
+    padding: 10px 30px;
+    font-size: 1.5rem;
+    background: #ffa500; /* Orange button */
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    font-weight: bold;
+}
+
+#start-button:hover {
+    background: #ff8c00;
+    transform: scale(1.1);
+}
