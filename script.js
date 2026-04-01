@@ -19,7 +19,7 @@ const tirePickupSound = new Audio('assets/tire-pickup.mp3');
 const watermelonPickupSound = new Audio('assets/watermelon-pickup.mp3');
 
 // --- IMAGES ---
-const playerImage = new Image(); playerImage.src = 'assets/Farmer (1).png';
+const playerImage = new Image(); playerImage.src = 'assets/farmer.png';
 const enemySprite = new Image(); enemySprite.src = 'assets/Poltra.png';
 const enemySprite2 = new Image(); enemySprite2.src = 'assets/SmartPoltra.png';
 const enemySprite3 = new Image(); enemySprite3.src = 'assets/Poltra3FL.png';
@@ -45,14 +45,14 @@ const enemies = [], seeds = [], plantedWatermelons = [], tires = [], guns = [];
 let spawnRateMultiplier = 1.0; 
 function increaseDifficulty() {
     if (isPaused) return;
-    spawnRateMultiplier *= 0.95;
+    // Slowed down scaling (0.97 is gentler than 0.92)
+    spawnRateMultiplier *= 0.90;
 }
-setInterval(increaseDifficulty, 120000); 
+setInterval(increaseDifficulty, 60000); 
 
 // --- PLAYER ---
 const player = {
     x: playerX, y: playerY, width: 288, height: 288,
-    // Hitbox is shrunk significantly (110px off each side)
     hitboxOffsetX: 110, 
     hitboxOffsetY: 110, 
     facingRight: false,
@@ -73,12 +73,6 @@ const player = {
             ctx.restore();
         } else {
             ctx.drawImage(playerImage, 0, frameY * 288, 288, 288, this.x, this.y, 288, 288);
-            
-            /* --- HITBOX DEBUGGER (Uncomment to see your hitbox) ---
-            ctx.strokeStyle = "red";
-            ctx.strokeRect(this.x + this.hitboxOffsetX, this.y + this.hitboxOffsetY, this.width - (this.hitboxOffsetX * 2), this.height - (this.hitboxOffsetY * 2));
-            */
-
             if (hasGun) {
                 ctx.save();
                 ctx.translate(this.x + 140, this.y + 160 + (isMoving ? Math.sin(gameFrame * 0.2) * 5 : 0));
@@ -98,26 +92,22 @@ function checkCollision(a, b, isItem = false) {
     let padding = isItem ? 60 : 0; 
     let aW = (isPowered && a === player) ? 576 : 288;
     let aH = (isPowered && a === player) ? 576 : 288;
-
-    // A's bounds
     let ax1 = a.x + (a.hitboxOffsetX || 0) - padding;
     let ay1 = a.y + (a.hitboxOffsetY || 0) - padding;
     let ax2 = a.x + aW - (a.hitboxOffsetX || 0) + padding;
     let ay2 = a.y + aH - (a.hitboxOffsetY || 0) + padding;
-
-    // B's bounds
     let bx1 = b.x + (b.hitboxOffsetX || 0);
     let by1 = b.y + (b.hitboxOffsetY || 0);
     let bx2 = b.x + (b.width || 288) - (b.hitboxOffsetX || 0);
     let by2 = b.y + (b.height || 288) - (b.hitboxOffsetY || 0);
-
     return ax1 < bx2 && ax2 > bx1 && ay1 < by2 && ay2 > by1;
 }
 
 // --- SPAWNING ---
 function createEnemy(type = 1) {
     let ex, ey;
-    do { ex = Math.random() * 2200; ey = Math.random() * 2200; } while (Math.hypot(playerX - ex, playerY - ey) < 800);
+    // Enemies spawn at a comfortable distance
+    do { ex = Math.random() * 2200; ey = Math.random() * 2200; } while (Math.hypot(playerX - ex, playerY - ey) < 700);
     let img = type === 1 ? enemySprite : (type === 2 ? enemySprite2 : enemySprite3);
     return { x: ex, y: ey, type, img, width: 288, height: type === 2 ? 432 : 288, speed: type === 1 ? 2 : (type === 2 ? 2.4 : 3.5), fIdx: 0, fT: 0, hitboxOffsetX: 90, hitboxOffsetY: 90 };
 }
@@ -237,20 +227,36 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// --- SPAWN TIMER ---
+// --- BALANCED SPAWN TIMER ---
 function spawnTick() {
     if (isPaused) return;
-    if (enemies.length < 15) enemies.push(createEnemy(1));
-    if (enemyKillScore >= 10 && enemies.length < 25) enemies.push(createEnemy(2));
-    if (enemyKillScore >= 20 && enemies.length < 30) enemies.push(createEnemy(3));
-    setTimeout(spawnTick, 5000 * spawnRateMultiplier);
+
+    const count1 = enemies.filter(e => e.type === 1).length;
+    const count2 = enemies.filter(e => e.type === 2).length;
+    const count3 = enemies.filter(e => e.type === 3).length;
+
+    // Spawn only ONE enemy per check to prevent overwhelming waves
+    if (count1 < 12) {
+        enemies.push(createEnemy(1));
+    } 
+    else if (enemyKillScore >= 10 && count2 < 6) {
+        enemies.push(createEnemy(2));
+    } 
+    else if (enemyKillScore >= 20 && count3 < 4) {
+        enemies.push(createEnemy(3));
+    }
+
+    // 3 seconds initial wait, adjusted by multiplier
+    let nextCheck = 3000 * spawnRateMultiplier;
+    setTimeout(spawnTick, nextCheck);
 }
 
 // START
 playerImage.onload = () => {
     spawnTick();
-    setInterval(() => { if (seeds.length < 5) seeds.push({x: Math.random()*2200, y: Math.random()*2200}); }, 10000);
-    setInterval(() => { if (tires.length < 1) tires.push({x: Math.random()*2200, y: Math.random()*2200}); }, 90000);
-    setInterval(() => { if (enemyKillScore >= 5 && !hasGun && !gunCoolDownActive && guns.length === 0) guns.push({x: Math.random()*2000, y: Math.random()*2000}); }, 5000);
+    // Regular item intervals
+    setInterval(() => { if (seeds.length < 5) seeds.push({x: Math.random()*2200, y: Math.random()*2200}); }, 12000);
+    setInterval(() => { if (tires.length < 1) tires.push({x: Math.random()*2200, y: Math.random()*2200}); }, 75000);
+    setInterval(() => { if (enemyKillScore >= 5 && !hasGun && !gunCoolDownActive && guns.length === 0) guns.push({x: Math.random()*2000, y: Math.random()*2000}); }, 4000);
     gameLoop();
 };
