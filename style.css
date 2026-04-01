@@ -47,17 +47,14 @@
 }
 
 #start-button {
-    margin-top: 20px;
-    padding: 10px 30px;
-    font-size: 1.5rem;
-    background: #ffa500; /* Orange button */
-    border: none;
+    display: flex;
     cursor: pointer;
-    border-radius: 5px;
-    font-weight: bold;
-}
-
-#start-button:hover {
-    background: #ff8c00;
-    transform: scale(1.1);
+    position: relative;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10; 
+    width: 64px;
+    height: 50px;
+    background: url("assets/Startbutton.png") no-repeat;
 }
