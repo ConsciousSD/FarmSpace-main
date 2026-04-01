@@ -12,7 +12,7 @@ gameAudio.volume = 0.3;
 
 const moveSound = new Audio('assets/footsteps-walking-in-snow-glitchedtones-1-1-00-28.mp3');
 const shootSound = new Audio('assets/Shotsound.mp3');
-shootSound.loop = true; 
+shootSound.loop = true;
 
 const seedPickupSound = new Audio('assets/seed-pickup.mp3');
 const tirePickupSound = new Audio('assets/tire-pickup.mp3');
@@ -29,12 +29,13 @@ const tractorSprite = new Image(); tractorSprite.src = "assets/Tractor.png";
 const tireSprite = new Image(); tireSprite.src = "assets/Wheel.png";
 const ak47Idle = new Image(); ak47Idle.src = "assets/AK47.png";
 const ak47Shooting = new Image(); ak47Shooting.src = "assets/AK47-shooting.png";
+const enemyDeathSprite = new Image(); enemyDeathSprite.src = "assets/Poltra-gets-shot.png";
 
 // --- GAME STATE ---
 let playerX = 1250, playerY = 1250;
 let moveUp = false, moveDown = false, moveLeft = false, moveRight = false;
 let isShooting = false, isMoving = false, gameFrame = 0;
-let frameX = 0, frameY = 0; 
+let frameX = 0, frameY = 0;
 let seedInventory = 0, enemyKillScore = 0, ammo = 0;
 let hasGun = false, gunCoolDownActive = false, killsSinceEmpty = 0;
 let isPowered = false, powerTimer = 0, isPaused = false;
@@ -42,19 +43,17 @@ let isPowered = false, powerTimer = 0, isPaused = false;
 const enemies = [], seeds = [], plantedWatermelons = [], tires = [], guns = [];
 
 // --- DIFFICULTY SCALING ---
-let spawnRateMultiplier = 1.0; 
+let spawnRateMultiplier = 1.0;
 function increaseDifficulty() {
     if (isPaused) return;
-    // Slowed down scaling (0.97 is gentler than 0.92)
     spawnRateMultiplier *= 0.90;
 }
-setInterval(increaseDifficulty, 60000); 
+setInterval(increaseDifficulty, 60000);
 
-// --- PLAYER ---
+// --- PLAYER OBJECT ---
 const player = {
     x: playerX, y: playerY, width: 288, height: 288,
-    hitboxOffsetX: 110, 
-    hitboxOffsetY: 110, 
+    hitboxOffsetX: 110, hitboxOffsetY: 110,
     facingRight: false,
     update() {
         this.x = playerX; this.y = playerY;
@@ -87,9 +86,9 @@ const player = {
     }
 };
 
-// --- COLLISION ---
+// --- COLLISION HELPER ---
 function checkCollision(a, b, isItem = false) {
-    let padding = isItem ? 60 : 0; 
+    let padding = isItem ? 60 : 0;
     let aW = (isPowered && a === player) ? 576 : 288;
     let aH = (isPowered && a === player) ? 576 : 288;
     let ax1 = a.x + (a.hitboxOffsetX || 0) - padding;
@@ -103,13 +102,18 @@ function checkCollision(a, b, isItem = false) {
     return ax1 < bx2 && ax2 > bx1 && ay1 < by2 && ay2 > by1;
 }
 
-// --- SPAWNING ---
+// --- ENEMY SPAWNER ---
 function createEnemy(type = 1) {
     let ex, ey;
-    // Enemies spawn at a comfortable distance
     do { ex = Math.random() * 2200; ey = Math.random() * 2200; } while (Math.hypot(playerX - ex, playerY - ey) < 700);
     let img = type === 1 ? enemySprite : (type === 2 ? enemySprite2 : enemySprite3);
-    return { x: ex, y: ey, type, img, width: 288, height: type === 2 ? 432 : 288, speed: type === 1 ? 2 : (type === 2 ? 2.4 : 3.5), fIdx: 0, fT: 0, hitboxOffsetX: 90, hitboxOffsetY: 90 };
+    return { 
+        x: ex, y: ey, type, img, 
+        width: 288, height: type === 2 ? 432 : 288, 
+        speed: type === 1 ? 2 : (type === 2 ? 2.4 : 3.5), 
+        fIdx: 0, fT: 0, hitboxOffsetX: 90, hitboxOffsetY: 90,
+        isDying: false, deathFrame: 0, deathTimer: 0 
+    };
 }
 
 // --- INPUTS ---
@@ -135,6 +139,10 @@ function gameLoop() {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     gameFrame++;
 
+    // 1. TRACTOR EXPIRATION
+    if (isPowered && Date.now() - powerTimer > 10000) { isPowered = false; }
+
+    // 2. PLAYER MOVEMENT
     let speed = isPowered ? 12 : 6;
     if (moveLeft) playerX -= speed; if (moveRight) playerX += speed;
     if (moveUp) playerY -= speed; if (moveDown) playerY += speed;
@@ -146,69 +154,82 @@ function gameLoop() {
     player.update();
     player.draw(ctx);
 
-    // PICKUPS
+    // 3. PICKUPS (Guns, Seeds, Tires)
     guns.forEach((g, i) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 600, 600);
-        if (checkCollision(player, {x:g.x, y:g.y, width:600, height:600, hitboxOffsetX: 50, hitboxOffsetY: 50}, true)) { hasGun = true; ammo = 100; guns.splice(i, 1); seedPickupSound.play(); }
+        if (checkCollision(player, { x: g.x, y: g.y, width: 600, height: 600, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { hasGun = true; ammo = 100; guns.splice(i, 1); seedPickupSound.play(); }
     });
     seeds.forEach((s, i) => {
-        ctx.drawImage(seedSprite, 0, (Math.floor(gameFrame/10)%2)*288, 288, 288, s.x, s.y, 288, 288);
-        if (checkCollision(player, {x:s.x, y:s.y, width:288, height:288, hitboxOffsetX: 70, hitboxOffsetY: 70}, true)) { seedInventory++; seeds.splice(i, 1); seedPickupSound.play(); }
+        ctx.drawImage(seedSprite, 0, (Math.floor(gameFrame / 10) % 2) * 288, 288, 288, s.x, s.y, 288, 288);
+        if (checkCollision(player, { x: s.x, y: s.y, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70 }, true)) { seedInventory++; seeds.splice(i, 1); seedPickupSound.play(); }
     });
     tires.forEach((t, i) => {
-        ctx.drawImage(tireSprite, 0, (Math.floor(gameFrame/15)%2)*300, 300, 300, t.x, t.y, 300, 300);
-        if (checkCollision(player, {x:t.x, y:t.y, width:300, height:300, hitboxOffsetX: 50, hitboxOffsetY: 50}, true)) { isPowered = true; powerTimer = Date.now(); tires.splice(i, 1); tirePickupSound.play(); }
+        ctx.drawImage(tireSprite, 0, (Math.floor(gameFrame / 15) % 2) * 300, 300, 300, t.x, t.y, 300, 300);
+        if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { isPowered = true; powerTimer = Date.now(); tires.splice(i, 1); tirePickupSound.play(); }
     });
 
-    // SHOOTING & ENEMIES
+    // 4. RELOAD LOGIC
     if (hasGun && isShooting) {
         ammo -= 0.15;
         if (ammo <= 0) { hasGun = false; isShooting = false; gunCoolDownActive = true; killsSinceEmpty = 0; shootSound.pause(); }
-        enemies.forEach((en, i) => {
-            if (Math.abs((en.y + (en.height/2)) - (playerY + 144)) < 150) {
-                let dx = en.x - playerX;
-                if (((player.facingRight && dx > 0) || (!player.facingRight && dx < 0)) && gameFrame % 15 === 0) {
-                    enemies.splice(i, 1); enemyKillScore++; if (gunCoolDownActive) killsSinceEmpty++;
+    }
+    if (gunCoolDownActive && killsSinceEmpty >= 10) { gunCoolDownActive = false; killsSinceEmpty = 0; }
+
+    // 5. ENEMIES LOOP (Movement & Hit Detection)
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let en = enemies[i];
+        if (en.isDying) {
+            en.deathTimer++;
+            if (en.deathTimer % 6 === 0) en.deathFrame++;
+            if (en.deathFrame < 6) {
+                let col = en.deathFrame % 2, row = Math.floor(en.deathFrame / 2);
+                ctx.drawImage(enemyDeathSprite, col * 64, row * 64, 64, 64, en.x, en.y, 288, 288);
+            } else { enemies.splice(i, 1); }
+        } else {
+            let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
+            let moveDir = (isPowered || (hasGun && isShooting)) ? -1 : 1;
+            en.x += (dx / dist) * en.speed * moveDir; en.y += (dy / dist) * en.speed * moveDir;
+            en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
+
+            // Draw Living Enemy
+            if (en.type === 2) {
+                let col = en.fIdx % 2, row = Math.floor(en.fIdx / 2);
+                ctx.drawImage(en.img, col * 288, row * 288, 288, 288, en.x, en.y, 288, 432);
+            } else if (en.type === 3) {
+                ctx.drawImage(en.img, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
+            } else {
+                ctx.drawImage(en.img, en.fIdx * 288, 0, 288, 288, en.x, en.y, 288, 288);
+            }
+
+            // Hit Detection
+            if (hasGun && isShooting && Math.abs((en.y + (en.height/2)) - (playerY + 144)) < 150) {
+                let pDx = en.x - playerX;
+                if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0)) && gameFrame % 15 === 0) {
+                    en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; enemyKillScore++;
                 }
             }
-        });
+            if (checkCollision(player, en)) {
+                if (isPowered) {
+                    en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; enemyKillScore++;
+                    if (gunCoolDownActive) killsSinceEmpty++;
+                } else { location.reload(); }
+            }
+        }
     }
 
-    enemies.forEach((en, i) => {
-        let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
-        let moveDir = (isPowered || (hasGun && isShooting)) ? -1 : 1;
-        en.x += (dx / dist) * en.speed * moveDir; en.y += (dy / dist) * en.speed * moveDir;
-        en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
-        
-        if (en.type === 2) {
-            const col = en.fIdx % 2, row = Math.floor(en.fIdx / 2);
-            ctx.drawImage(en.img, col * 288, row * 288, 288, 288, en.x, en.y, 288, 432);
-        } else if (en.type === 3) {
-            ctx.drawImage(en.img, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
-        } else {
-            ctx.drawImage(en.img, en.fIdx * 288, 0, 288, 288, en.x, en.y, 288, 288);
-        }
-        if (checkCollision(player, en)) {
-            if (isPowered) { enemies.splice(i, 1); enemyKillScore++; if (gunCoolDownActive) killsSinceEmpty++; }
-            else { location.reload(); }
-        }
-    });
-
-    if (gunCoolDownActive && killsSinceEmpty >= 10) { gunCoolDownActive = false; killsSinceEmpty = 0; }
-    if (isPowered && Date.now() - powerTimer > 10000) isPowered = false;
-
-    // WATERMELONS
+    // 6. WATERMELONS
     for (let i = plantedWatermelons.length - 1; i >= 0; i--) {
         let wm = plantedWatermelons[i];
         if (!wm.done) { wm.fT++; if (wm.fT > 50) { wm.fIdx++; wm.fT = 0; if (wm.fIdx >= 8) wm.done = true; } }
         ctx.drawImage(watermelonSprite, (wm.fIdx % 3) * 288, Math.floor(wm.fIdx / 3) * 288, 288, 288, wm.x, wm.y, 288, 288);
         if (wm.done && checkCollision(player, wm)) {
             plantedWatermelons.splice(i, 1); watermelonPickupSound.play();
-            if (enemies.length > 0) { enemies.shift(); enemyKillScore++; if (gunCoolDownActive) killsSinceEmpty++; }
+            let target = enemies.find(e => !e.isDying);
+            if (target) { target.isDying = true; enemyKillScore++; if (gunCoolDownActive) killsSinceEmpty++; }
         }
     }
 
-    // HUD
+    // 7. HUD
     ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(10, 10, 750, 240);
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
     ctx.fillText(`Seeds: ${seedInventory} | Kills: ${enemyKillScore}`, 30, 60);
@@ -222,41 +243,32 @@ function gameLoop() {
     } else if (enemyKillScore < 5) {
         ctx.fillStyle = 'gray'; ctx.fillText(`GUN LOCKED: ${enemyKillScore}/5`, 30, 210);
     }
-    if (isPowered) { ctx.fillStyle = 'yellow'; ctx.fillText(`TRACTOR: ${Math.ceil((10000-(Date.now()-powerTimer))/1000)}s`, 350, 60); }
+    if (isPowered) { 
+        ctx.fillStyle = 'yellow'; 
+        let rem = Math.max(0, Math.ceil((10000 - (Date.now() - powerTimer)) / 1000));
+        ctx.fillText(`TRACTOR: ${rem}s`, 350, 60); 
+    }
 
     requestAnimationFrame(gameLoop);
 }
 
-// --- BALANCED SPAWN TIMER ---
+// --- SPAWN TIMER ---
 function spawnTick() {
     if (isPaused) return;
-
-    const count1 = enemies.filter(e => e.type === 1).length;
-    const count2 = enemies.filter(e => e.type === 2).length;
-    const count3 = enemies.filter(e => e.type === 3).length;
-
-    // Spawn only ONE enemy per check to prevent overwhelming waves
-    if (count1 < 12) {
-        enemies.push(createEnemy(1));
-    } 
-    else if (enemyKillScore >= 10 && count2 < 6) {
-        enemies.push(createEnemy(2));
-    } 
-    else if (enemyKillScore >= 20 && count3 < 4) {
-        enemies.push(createEnemy(3));
-    }
-
-    // 3 seconds initial wait, adjusted by multiplier
-    let nextCheck = 3000 * spawnRateMultiplier;
-    setTimeout(spawnTick, nextCheck);
+    const c1 = enemies.filter(e => e.type === 1).length;
+    const c2 = enemies.filter(e => e.type === 2).length;
+    const c3 = enemies.filter(e => e.type === 3).length;
+    if (c1 < 12) enemies.push(createEnemy(1));
+    else if (enemyKillScore >= 10 && c2 < 6) enemies.push(createEnemy(2));
+    else if (enemyKillScore >= 20 && c3 < 4) enemies.push(createEnemy(3));
+    setTimeout(spawnTick, 3000 * spawnRateMultiplier);
 }
 
-// START
+// --- START ---
 playerImage.onload = () => {
     spawnTick();
-    // Regular item intervals
-    setInterval(() => { if (seeds.length < 5) seeds.push({x: Math.random()*2200, y: Math.random()*2200}); }, 12000);
-    setInterval(() => { if (tires.length < 1) tires.push({x: Math.random()*2200, y: Math.random()*2200}); }, 75000);
-    setInterval(() => { if (enemyKillScore >= 5 && !hasGun && !gunCoolDownActive && guns.length === 0) guns.push({x: Math.random()*2000, y: Math.random()*2000}); }, 4000);
+    setInterval(() => { if (seeds.length < 5) seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 12000);
+    setInterval(() => { if (tires.length < 1) tires.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 75000);
+    setInterval(() => { if (enemyKillScore >= 5 && !hasGun && !gunCoolDownActive && guns.length === 0) guns.push({ x: Math.random() * 2000, y: Math.random() * 2000 }); }, 4000);
     gameLoop();
 };
