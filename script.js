@@ -36,6 +36,7 @@ const tireSprite = new Image(); tireSprite.src = "assets/Wheel.png";
 const ak47Idle = new Image(); ak47Idle.src = "assets/AK47.png";
 const ak47Shooting = new Image(); ak47Shooting.src = "assets/AK47-shooting.png";
 const enemyDeathSprite = new Image(); enemyDeathSprite.src = "assets/Poltra-gets-shot.png";
+const enemyDeathSprite2 = new Image(); enemyDeathSprite2.src = "assets/SmartPoltraShot.png";
 const corralSprite = new Image(); corralSprite.src = 'assets/corral.png';
 const pigIdle = new Image(); pigIdle.src = 'assets/SpacePig.png';
 const pigWalk = new Image(); pigWalk.src = 'assets/SpacePigWalking.png';
@@ -49,9 +50,9 @@ let seedInventory = 0, enemyKillScore = 0, ammo = 0;
 let hasGun = false, gunCoolDownActive = false, killsSinceEmpty = 0;
 let isPowered = false, powerTimer = 0, isPaused = false;
 const pigs = [];
-let carryingPig = null; 
+let carryingPig = null;
 let pigsSaved = 0;
-let lastPigSoundTime = 0; 
+let lastPigSoundTime = 0;
 let isGameOver = false;
 let highScore = localStorage.getItem('farmSpaceHighScore') || 0;
 let pigHighScore = localStorage.getItem('farmSpacePigHighScore') || 0;
@@ -163,7 +164,7 @@ function triggerGameOver() {
 window.onkeydown = e => {
     let k = e.key.toLowerCase();
     if (gameAudio.paused) gameAudio.play();
-    
+
     // Restart logic
     if (k === 'r' && isGameOver) {
         location.reload(); // Simplest way to reset all arrays and timers
@@ -182,7 +183,7 @@ window.onkeydown = e => {
                 if (checkCollision(player, { x: p.x, y: p.y, width: 240, height: 240 })) {
                     carryingPig = p;
                     pigPickupSound.currentTime = 0;
-                    pigPickupSound.play(); 
+                    pigPickupSound.play();
                 }
             });
         }
@@ -204,25 +205,25 @@ function gameLoop() {
     // --- CHECK GAME OVER ---
     if (isGameOver) {
         ctx.fillStyle = 'rgba(0,0,0,0.85)';
-        ctx.fillRect(0,0, CANVAS_WIDTH, CANVAS_HEIGHT);
-        
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
         ctx.textAlign = 'center';
         ctx.fillStyle = 'white';
         ctx.font = 'bold 160px Arial';
-        ctx.fillText('GAME OVER', CANVAS_WIDTH/2, CANVAS_HEIGHT/2 - 100);
-        
+        ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 100);
+
         ctx.font = '80px Arial';
-        ctx.fillText(`Kills: ${enemyKillScore}  |  Pigs Saved: ${pigsSaved}`, CANVAS_WIDTH/2, CANVAS_HEIGHT/2 + 50);
-        
+        ctx.fillText(`Kills: ${enemyKillScore}  |  Pigs Saved: ${pigsSaved}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 50);
+
         ctx.fillStyle = '#FFD700'; // Gold color for high score
-        ctx.fillText(`PERSONAL BEST: ${highScore}`, CANVAS_WIDTH/2, CANVAS_HEIGHT/2 + 160);
-        
+        ctx.fillText(`PERSONAL BEST: ${highScore}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 160);
+
         ctx.fillStyle = '#66ff66'; // Light green for the rescue score
-        ctx.fillText(`Pigs Saved: ${pigsSaved} (Best: ${pigHighScore})`, CANVAS_WIDTH/2, CANVAS_HEIGHT/2 + 260);
+        ctx.fillText(`Pigs Saved: ${pigsSaved} (Best: ${pigHighScore})`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 260);
 
         ctx.fillStyle = 'white';
         ctx.font = '50px Arial';
-        ctx.fillText('Press [ R ] to Restart', CANVAS_WIDTH/2, CANVAS_HEIGHT/2 + 350);
+        ctx.fillText('Press [ R ] to Restart', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 350);
         return; // Stop processing the rest of the game
     }
 
@@ -265,22 +266,50 @@ function gameLoop() {
     }
     if (gunCoolDownActive && killsSinceEmpty >= 10) { gunCoolDownActive = false; killsSinceEmpty = 0; }
 
+
     // 5. ENEMIES LOOP
     for (let i = enemies.length - 1; i >= 0; i--) {
         let en = enemies[i];
+
+        // --- DEATH ANIMATION LOGIC ---
         if (en.isDying) {
             en.deathTimer++;
             if (en.deathTimer % 6 === 0) en.deathFrame++;
+
             if (en.deathFrame < 6) {
-                let col = en.deathFrame % 2, row = Math.floor(en.deathFrame / 2);
-                ctx.drawImage(enemyDeathSprite, col * 64, row * 64, 64, 64, en.x, en.y, 288, 288);
-            } else { enemies.splice(i, 1); }
+                let col = en.deathFrame % 2;
+                let row = Math.floor(en.deathFrame / 2);
+
+                // Determine which sprite and frame size to use
+                let deathImg, sW, sH, dH;
+                if (en.type === 2) {
+                    deathImg = enemyDeathSprite2; // Your 256x384 sheet
+                    sW = 128; // 256 / 2 columns
+                    sH = 128; // 384 / 3 rows
+                    dH = 288; // Match the Smart Poltra's living height
+                } else {
+                    deathImg = enemyDeathSprite;  // Your original 64x64 sheet
+                    sW = 64;
+                    sH = 64;
+                    dH = 288; // Match the standard Poltra height
+                }
+
+                ctx.drawImage(
+                    deathImg,
+                    col * sW, row * sH, sW, sH, // Source
+                    en.x, en.y, 288, dH         // Destination
+                );
+            } else {
+                enemies.splice(i, 1);
+            }
         } else {
+            // --- MOVEMENT & AI ---
             let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
             let moveDir = (isPowered || (hasGun && isShooting)) ? -1 : 1;
             en.x += (dx / dist) * en.speed * moveDir; en.y += (dy / dist) * en.speed * moveDir;
             en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
 
+            // --- DRAW LIVING ENEMIES ---
             if (en.type === 2) {
                 let col = en.fIdx % 2, row = Math.floor(en.fIdx / 2);
                 ctx.drawImage(en.img, col * 288, row * 288, 288, 288, en.x, en.y, 288, 432);
@@ -290,19 +319,31 @@ function gameLoop() {
                 ctx.drawImage(en.img, en.fIdx * 288, 0, 288, 288, en.x, en.y, 288, 288);
             }
 
+            // --- SHOOT DETECTION ---
             if (hasGun && isShooting && Math.abs((en.y + (en.height / 2)) - (playerY + 144)) < 150) {
                 let pDx = en.x - playerX;
                 if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0)) && gameFrame % 15 === 0) {
                     en.health--;
-                    if (en.health <= 0) { en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; enemyKillScore++; }
+                    if (en.health <= 0) {
+                        en.isDying = true;
+                        en.deathFrame = 0;
+                        en.deathTimer = 0;
+                        enemyKillScore++;
+                    }
                 }
             }
+
+            // --- COLLISION DETECTION ---
             if (checkCollision(player, en)) {
                 if (isPowered) {
-                    en.health = 0; en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; enemyKillScore++;
+                    en.health = 0;
+                    en.isDying = true;
+                    en.deathFrame = 0;
+                    en.deathTimer = 0;
+                    enemyKillScore++;
                     if (gunCoolDownActive) killsSinceEmpty++;
-                } else { 
-                    triggerGameOver(); // REPLACED location.reload()
+                } else {
+                    triggerGameOver();
                 }
             }
         }
@@ -390,12 +431,32 @@ function gameLoop() {
 // --- SPAWN TIMER ---
 function spawnTick() {
     if (isPaused || isGameOver) return;
+
     const c1 = enemies.filter(e => e.type === 1).length;
     const c2 = enemies.filter(e => e.type === 2).length;
     const c3 = enemies.filter(e => e.type === 3).length;
-    if (c1 < 12) enemies.push(createEnemy(1));
-    else if (enemyKillScore >= 10 && c2 < 6) enemies.push(createEnemy(2));
-    else if (enemyKillScore >= 20 && c3 < 4) enemies.push(createEnemy(3));
+
+    // We create an array of "Possible Spawns" based on your current score
+    let possibleTypes = [];
+
+    // Always allow Type 1 if under the limit
+    if (c1 < 8) possibleTypes.push(1);
+
+    // Allow Type 2 if score is 20+ and under the limit
+    if ((enemyKillScore >= 20 || pigsSaved >= 10)&& c2< 4) {
+        possibleTypes.push(2);
+    }
+
+    // Allow Type 3 if score is 40+ and under the limit
+    if (enemyKillScore >= 40 && c3 < 2) possibleTypes.push(3);
+
+    // If we have any valid types to spawn, pick one at random from the allowed list
+    if (possibleTypes.length > 0) {
+        let chosenType = possibleTypes[Math.floor(Math.random() * possibleTypes.length)];
+        enemies.push(createEnemy(chosenType));
+    }
+
+    // This ensures the timer NEVER stops, even if the screen is full
     setTimeout(spawnTick, 3000 * spawnRateMultiplier);
 }
 
