@@ -40,6 +40,8 @@ const corralSprite = new Image(); corralSprite.src = 'assets/corral.png';
 const pigIdle = new Image(); pigIdle.src = 'assets/SpacePig.png';
 const pigWalk = new Image(); pigWalk.src = 'assets/SpacePigWalking.png';
 const grenadeSprite = new Image(); grenadeSprite.src = 'assets/Grenade.png';
+const chickenSprite = new Image(); chickenSprite.src = 'assets/SpaceChicken.png';
+
 
 // --- GAME STATE ---
 let playerX = 1250, playerY = 1250;
@@ -54,6 +56,10 @@ let carryingPig = null;
 let pigsSaved = 0;
 let lastPigSoundTime = 0;
 
+const chickens = [];
+let carryingChicken = null;
+let chickensSaved = 0;
+
 const enemies = [], seeds = [], plantedWatermelons = [], tires = [], guns = [];
 const grenadesOnGround = [];
 const activeGrenades = [];
@@ -61,6 +67,7 @@ let carryingGrenade = false;
 
 let highScore = localStorage.getItem('farmSpaceHighScore') || 0;
 let pigHighScore = localStorage.getItem('farmSpacePigHighScore') || 0;
+let chickenHighScore = localStorage.getItem('farmSpaceChickenHighScore') || 0; // Added this
 
 const corral = { x: 20, y: (CANVAS_HEIGHT / 2) - 150, width: 300, height: 300 };
 
@@ -107,6 +114,7 @@ function triggerGameOver() {
     gameAudio.volume = 0.1;
     if (enemyKillScore > highScore) { highScore = enemyKillScore; localStorage.setItem('farmSpaceHighScore', highScore); }
     if (pigsSaved > pigHighScore) { pigHighScore = pigsSaved; localStorage.setItem('farmSpacePigHighScore', pigHighScore); }
+    if (chickensSaved > chickenHighScore) { chickenHighScore = chickensSaved; localStorage.setItem('farmSpaceChickenHighScore', chickenHighScore); }
 }
 
 // --- PLAYER OBJECT ---
@@ -158,7 +166,8 @@ window.onkeydown = e => {
         } 
     }
     if (k === 'd') {
-        if (carryingPig) { carryingPig = null; } 
+        if (carryingPig) { carryingPig = null; }
+        else if (carryingChicken) { carryingChicken = null; }
         else if (!carryingGrenade) {
             let grabbed = false;
             grenadesOnGround.forEach((g, i) => {
@@ -167,9 +176,16 @@ window.onkeydown = e => {
                 }
             });
             if (!grabbed) {
+                // Try to grab pig
                 pigs.forEach(p => {
-                    if (checkCollision(player, { x: p.x, y: p.y, width: 240, height: 240 })) {
-                        carryingPig = p; pigPickupSound.currentTime = 0; pigPickupSound.play();
+                    if (!grabbed && checkCollision(player, { x: p.x, y: p.y, width: 240, height: 240 })) {
+                        carryingPig = p; pigPickupSound.currentTime = 0; pigPickupSound.play(); grabbed = true;
+                    }
+                });
+                // Try to grab chicken
+                chickens.forEach(c => {
+                    if (!grabbed && checkCollision(player, { x: c.x, y: c.y, width: 240, height: 240 })) {
+                        carryingChicken = c; pigPickupSound.currentTime = 0; pigPickupSound.play(); grabbed = true;
                     }
                 });
             }
@@ -201,7 +217,7 @@ function gameLoop() {
         ctx.font = '70px Arial';
         ctx.fillText(`Kills: ${enemyKillScore} (Best: ${highScore})`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
         ctx.fillStyle = '#66ff66';
-        ctx.fillText(`Pigs Saved: ${pigsSaved} (Best: ${pigHighScore})`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 100);
+        ctx.fillText(`Pigs Saved: ${pigsSaved} | Chickens: ${chickensSaved}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 100);
         ctx.fillStyle = 'white'; ctx.font = '50px Arial';
         ctx.fillText('Press [ R ] to Restart', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
         return;
@@ -279,11 +295,11 @@ function gameLoop() {
         }
     }
 
-    let anyPigWalking = false;
+    let anyAnimalWalking = false;
     pigs.forEach((pig) => {
         if (pig === carryingPig) { pig.x = playerX + 50; pig.y = playerY + 50; }
         else {
-            anyPigWalking = true; pig.x += pig.vx; pig.y += pig.vy;
+            anyAnimalWalking = true; pig.x += pig.vx; pig.y += pig.vy;
             if (pig.x < 0 || pig.x > CANVAS_WIDTH - 240) pig.vx *= -1;
             if (pig.y < 0 || pig.y > CANVAS_HEIGHT - 240) pig.vy *= -1;
             pig.fT++; if (pig.fT > 15) { pig.fIdx = (pig.fIdx + 1) % 3; pig.fT = 0; }
@@ -295,11 +311,30 @@ function gameLoop() {
         ctx.restore();
     });
 
+    chickens.forEach((chicken) => {
+        if (chicken === carryingChicken) { chicken.x = playerX + 50; chicken.y = playerY + 50; }
+        else {
+            anyAnimalWalking = true; chicken.x += chicken.vx; chicken.y += chicken.vy;
+            if (chicken.x < 0 || chicken.x > CANVAS_WIDTH - 240) chicken.vx *= -1;
+            if (chicken.y < 0 || chicken.y > CANVAS_HEIGHT - 240) chicken.vy *= -1;
+            chicken.fT++; if (chicken.fT > 15) { chicken.fIdx = (chicken.fIdx + 1) % 1; chicken.fT = 0; }
+        }
+        ctx.save(); ctx.translate(chicken.x + 120, chicken.y + 120);
+        if (chicken !== carryingChicken && chicken.vx < 0) ctx.scale(-1, 1);
+        // Uses SpaceChicken.png asset
+        ctx.drawImage(chickenSprite, 0, 0, 64, 64, -120, -120, 240, 240);
+        ctx.restore();
+    });
+    
+
     let now = Date.now();
-    if (anyPigWalking && (now - lastPigSoundTime > 15000)) { pigWalkSound.currentTime = 0; pigWalkSound.play(); lastPigSoundTime = now; }
+    if (anyAnimalWalking && (now - lastPigSoundTime > 15000)) { pigWalkSound.currentTime = 0; pigWalkSound.play(); lastPigSoundTime = now; }
 
     if (carryingPig && checkCollision(player, corral)) {
         pigs.splice(pigs.indexOf(carryingPig), 1); carryingPig = null; pigsSaved++; watermelonPickupSound.play();
+    }
+    if (carryingChicken && checkCollision(player, corral)) {
+        chickens.splice(chickens.indexOf(carryingChicken), 1); carryingChicken = null; chickensSaved++; watermelonPickupSound.play();
     }
 
     // --- 8. WATERMELONS (FIXED ANIMATION) ---
@@ -342,7 +377,7 @@ function gameLoop() {
 
     ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(10, 10, 850, 240);
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
-    ctx.fillText(`Seeds: ${seedInventory} | Kills: ${enemyKillScore} | Saved: ${pigsSaved}`, 30, 60);
+    ctx.fillText(`Seeds: ${seedInventory} | Kills: ${enemyKillScore} | Saved: ${pigsSaved} | Chickens: ${chickensSaved}`, 30, 60);
     if (hasGun) {
         ctx.fillText("AMMO:", 30, 210); ctx.fillStyle = 'black'; ctx.fillRect(180, 185, 200, 30);
         ctx.fillStyle = ammo > 30 ? '#00FF00' : '#FF0000'; ctx.fillRect(180, 185, ammo * 2, 30);
@@ -364,7 +399,6 @@ function spawnTick() {
           c3 = enemies.filter(e => e.type === 3).length;
     
     let possible = [];
-    // FIX: Cap at 40 so the wave never feels "dead"
     if (c1 < (40 + Math.floor(enemyKillScore / 10))) possible.push(1);
     if ((enemyKillScore >= 20 || pigsSaved >= 10) && c2 < 8) possible.push(2);
     if (enemyKillScore >= 40 && c3 < 4) possible.push(3);
@@ -389,6 +423,9 @@ function startGame() {
     setInterval(() => { if (!isGameOver && seeds.length < 5) seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 12000);
     setInterval(() => {
         if (!isGameOver && pigs.length < 5 && !isPaused) pigs.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 });
+    }, 5000);
+    setInterval(() => {
+        if (!isGameOver && chickens.length < 5 && !isPaused) chickens.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 });
     }, 5000);
     setInterval(() => { if (!isGameOver && tires.length < 1) tires.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 75000);
     setInterval(() => { if (!isGameOver && enemyKillScore >= 5 && !hasGun && !gunCoolDownActive && guns.length === 0) guns.push({ x: Math.random() * 2000, y: Math.random() * 2000 }); }, 4000);
