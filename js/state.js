@@ -19,6 +19,8 @@ export const gameState = {
     scythes: [],
     inventory: [null, null, null, null, null], // Slots 0-4 mapping to Hotkeys 1-5
     activeSlot: 0,                             // The currently selected index
+    scytheDurability: 3,                       // Swings remaining on current tool
+    maxScytheDurability: 3,                    // Total baseline maximum capacity
 
     // --- ANIMALS & COLLECTIBLES ---
     pigs: [], carryingPig: null, pigsSaved: 0, lastPigSoundTime: 0,
@@ -29,6 +31,15 @@ export const gameState = {
     enemies: [], seeds: [], plantedWatermelons: [], tires: [], guns: [],
     grenadesOnGround: [], activeGrenades: [], carryingGrenade: false,
     
+    // --- LOCAL MULTIPLAYER SYSTEM ---
+    isMultiplayer: false,
+    playerRole: 'farmer',                      // Can be 'farmer' or 'alien-master'
+    connectionId: null,                        // Room code string to link browsers
+    peerConnection: null,                      // Direct network communication channel object
+    spawnCooldown: 0,                          // Interval counter to stagger alien drops
+    alienMasterSeeds: 0,                       // Stolen seed count to spend on spawns
+    controlledEnemyId: null,                   // Network ID of the currently possessed alien
+
     // --- PERSISTENT STATE DATA ---
     highScore: localStorage.getItem('farmSpaceHighScore') || 0,
     pigHighScore: localStorage.getItem('farmSpacePigHighScore') || 0,

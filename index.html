@@ -16,7 +16,17 @@
     <div id="start-screen">
         <h1>Farm Space</h1>
         <br>
-        <button id="start-button">START</button>
+        <button id="start-button">START SOLO</button>
+
+        <div class="multiplayer-menu">
+            <hr class="menu-divider">
+            <h3>🌌 Local Host Versus Mode</h3>
+            <input type="text" id="room-code-input" placeholder="Enter Room Code (e.g., love)">
+            <div class="menu-row">
+                <button id="host-farmer-btn">👩‍🌾 Host (Farmer)</button>
+                <button id="join-master-btn">🛸 Join (Alien Master)</button>
+            </div>
+        </div>
     </div>
 
     <div id="instructions-modal" class="modal-overlay">
@@ -57,5 +67,6 @@
     </div>
   
     <script type="module" src="js/main.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </body>
 </html>

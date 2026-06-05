@@ -1,4 +1,4 @@
-import { gameState, CANVAS_WIDTH, CANVAS_HEIGHT } from './state.js';
+import { gameState, canvas } from './state.js';
 import { gameAudio, shootSound, pigPickupSound, chickenPickupSound, watermelonPickupSound, seedPickupSound } from './audio.js';
 import { checkCollision } from './helpers.js';
 import { player } from './player.js';
@@ -6,74 +6,96 @@ import { player } from './player.js';
 export function initInput() {
     window.onkeydown = e => {
         let k = e.key.toLowerCase();
+
+        // --- ALIEN MASTER MODE CONTROL INTERCEPTIONS ---
+        if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
+            if (k === 's') {
+                if (gameState.alienMasterSeeds > 0 && gameState.peerConnection) {
+                    gameState.alienMasterSeeds--;
+                    gameState.peerConnection.send({
+                        type: 'SPAWN_ALIEN',
+                        id: Math.random().toString(36).substr(2, 9), 
+                        enemyType: Math.floor(Math.random() * 3) + 1,
+                        x: 1250,
+                        y: 1250
+                    });
+                } else {
+                    console.log("Cannot spawn! Your aliens must collect a seed resource first.");
+                }
+            }
+
+            if (gameState.controlledEnemyId && gameState.peerConnection) {
+                let activeAlien = gameState.enemies.find(en => en.id === gameState.controlledEnemyId);
+                if (activeAlien) {
+                    let alienSpeed = 25; // Snappy speed for active tracking steering
+                    if (e.key === 'ArrowUp') activeAlien.y -= alienSpeed;
+                    if (e.key === 'ArrowDown') activeAlien.y += alienSpeed;
+                    if (e.key === 'ArrowLeft') activeAlien.x -= alienSpeed;
+                    if (e.key === 'ArrowRight') activeAlien.x += alienSpeed;
+
+                    gameState.peerConnection.send({
+                        type: 'CONTROL_MOVE',
+                        id: gameState.controlledEnemyId,
+                        x: activeAlien.x,
+                        y: activeAlien.y
+                    });
+                }
+            }
+            return; 
+        }
+
+        // --- STANDARD SURVIVOR CONTROLS ---
         if (gameAudio.paused) gameAudio.play();
         if (k === 'r' && gameState.isGameOver) location.reload();
         if (k === 'arrowup') gameState.moveUp = true; if (k === 'arrowdown') gameState.moveDown = true;
         if (k === 'arrowleft') gameState.moveLeft = true; if (k === 'arrowright') gameState.moveRight = true;
         if (k === 'p') gameState.isPaused = !gameState.isPaused;
 
-        // Hotbar Slot Selection (Keys 1-5)
         if (['1', '2', '3', '4', '5'].includes(k)) {
             let slotIndex = parseInt(k) - 1;
             gameState.activeSlot = slotIndex;
-            
-            // Sync legacy engine flags based on active slot contents
             gameState.hasGun = (gameState.inventory[slotIndex] === 'gun');
             gameState.hasScythe = (gameState.inventory[slotIndex] === 'scythe');
         }
 
-        // Shoot check bound dynamically to active item type 'gun'
         if (k === 's') {
             if (gameState.inventory[gameState.activeSlot] === 'gun' && gameState.ammo > 0) {
-                gameState.isShooting = true; 
-                shootSound.play(); 
+                gameState.isShooting = true; shootSound.play(); 
             }
         }
 
-        // Key 'A' specifically handles plowing the ground
         if (k === 'a') {
-            if (gameState.hasScythe) {
-                // 1. Calculate tile coordinates centered near player feet
+            if (gameState.hasScythe && gameState.scytheDurability > 0) {
                 let patchX = Math.floor((gameState.playerX + 94) / 100) * 100;
                 let patchY = Math.floor((gameState.playerY + 144) / 100) * 100;
-
-                // 2. Only plow if this exact spot isn't already a dirt patch
                 let alreadyPlowed = gameState.plowedPatches.some(p => p.x === patchX && p.y === patchY);
 
                 if (!alreadyPlowed) {
-                    gameState.plowedPatches.push({ x: patchX, y: patchY, size: 150 });
-                    seedPickupSound.currentTime = 0;
-                    seedPickupSound.play(); 
+                    gameState.plowedPatches.push({ x: patchX, y: patchY, size: 150, createdAt: Date.now() });
+                    seedPickupSound.currentTime = 0; seedPickupSound.play(); 
+                    gameState.scytheDurability--;
+
+                    if (gameState.scytheDurability <= 0) {
+                        let scytheSlot = gameState.inventory.indexOf('scythe');
+                        if (scytheSlot !== -1) gameState.inventory[scytheSlot] = null;
+                        gameState.hasScythe = false;
+                    }
                 }
             }
         }
 
-        // Spacebar now ONLY plants watermelons if standing inside a plowed patch
         if (k === ' ') {
             if (gameState.seedInventory > 0) {
-                let playerFeetX = gameState.playerX + 144; // Mid-axis of player footprint
-                let playerFeetY = gameState.playerY + 200; // Y coordinate near player feet
-
-                // Check if the player's coordinate rests inside ANY plowed patch square element bounds
+                let playerFeetX = gameState.playerX + 144;
+                let playerFeetY = gameState.playerY + 200;
                 let targetedPatch = gameState.plowedPatches.find(patch => {
-                    return playerFeetX >= patch.x && 
-                           playerFeetX <= patch.x + patch.size && 
-                           playerFeetY >= patch.y && 
-                           playerFeetY <= patch.y + patch.size;
+                    return playerFeetX >= patch.x && playerFeetX <= patch.x + patch.size && playerFeetY >= patch.y && playerFeetY <= patch.y + patch.size;
                 });
 
                 if (targetedPatch) {
-                    // Snaps and centers the 288px watermelon asset inside the 150px dirt patch perfectly
                     gameState.plantedWatermelons.push({
-                        x: targetedPatch.x + (targetedPatch.size / 2) - 144,
-                        y: targetedPatch.y + (targetedPatch.size / 2) - 144,
-                        fIdx: 0,
-                        fT: 0,
-                        done: false,
-                        width: 288,
-                        height: 288,
-                        hitboxOffsetX: 70,
-                        hitboxOffsetY: 70
+                        x: targetedPatch.x + (targetedPatch.size / 2) - 144, y: targetedPatch.y + (targetedPatch.size / 2) - 144,
+                        fIdx: 0, fT: 0, done: false, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70
                     });
                     gameState.seedInventory--;
                 }
@@ -107,6 +129,7 @@ export function initInput() {
     };
 
     window.onkeyup = e => {
+        if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') return;
         let k = e.key.toLowerCase();
         if (k === 'arrowup') gameState.moveUp = false; if (k === 'arrowdown') gameState.moveDown = false;
         if (k === 'arrowleft') gameState.moveLeft = false; if (k === 'arrowright') gameState.moveRight = false;
@@ -117,30 +140,33 @@ export function initInput() {
         }
     };
 
-    // FIXED: Hooked up DOM listeners to run the Manual modal window
+    // --- ALIEN MASTER LEFT-CLICK MIND CONTROL SELECTOR ---
+    window.addEventListener('mousedown', e => {
+        if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = (e.clientX - rect.left) * (2500 / rect.width);
+            const clickY = (e.clientY - rect.top) * (2500 / rect.height);
+
+            if (e.button === 0) { 
+                let clickedAlien = gameState.enemies.find(en => {
+                    return clickX >= en.x && clickX <= en.x + 288 &&
+                           clickY >= en.y && clickY <= en.y + 288;
+                });
+
+                if (clickedAlien) {
+                    gameState.controlledEnemyId = clickedAlien.id;
+                    console.log(`Direct mind control hijacked target ID: ${clickedAlien.id}`);
+                }
+            }
+        }
+    });
+
     const modal = document.getElementById('instructions-modal');
     const openBtn = document.getElementById('help-button');
     const closeBtn = document.getElementById('close-modal-btn');
-
     if (openBtn && modal && closeBtn) {
-        // Tapping button freezes the environment layout metrics and blurs background
-        openBtn.addEventListener('click', () => {
-            modal.style.display = 'flex';
-            gameState.isPaused = true;
-        });
-
-        // Unfreezes engine frames and hides manual overlay card
-        closeBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-            gameState.isPaused = false;
-        });
-
-        // Click outside the box container boundary fallback
-        window.addEventListener('click', e => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-                gameState.isPaused = false;
-            }
-        });
+        openBtn.addEventListener('click', () => { modal.style.display = 'flex'; gameState.isPaused = true; });
+        closeBtn.addEventListener('click', () => { modal.style.display = 'none'; gameState.isPaused = false; });
+        window.addEventListener('click', e => { if (e.target === modal) { modal.style.display = 'none'; gameState.isPaused = false; } });
     }
 }
