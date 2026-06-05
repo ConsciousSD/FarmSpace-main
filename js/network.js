@@ -31,17 +31,17 @@ function setupConnection(conn) {
         // --- SURVIVOR (WIFE / FARMER) SIDE INTERCEPTS PACKETS ---
         if (gameState.playerRole === 'farmer') {
             if (data.type === 'SPAWN_ALIEN') {
-                console.log(`Master requested spawn: Type ${data.enemyType} at [${data.x}, ${data.y}]`);
+                console.log(`Master requested spawn: Type ${data.enemyType}`);
                 
-                // Call your native internal game helper function to configure stats
+                // FIXED: Create the alien directly on the Host engine space
                 const newEnemy = createEnemy(data.enemyType);
                 if (newEnemy) {
                     newEnemy.id = data.id; 
                     newEnemy.x = data.x;
                     newEnemy.y = data.y;
-                    newEnemy.isLocallyControlled = false; // Starts tracking her automatically
-
-                    // FIXED: Force her engine to push the new unit into the live array stack
+                    newEnemy.isLocallyControlled = false; 
+                    
+                    // Force push into her active game array stack layout
                     gameState.enemies.push(newEnemy);
                 }
             }
@@ -50,7 +50,7 @@ function setupConnection(conn) {
                 if (targetedAlien) {
                     targetedAlien.x = data.x;
                     targetedAlien.y = data.y;
-                    targetedAlien.isLocallyControlled = true; // Hijacks normal automatic tracking
+                    targetedAlien.isLocallyControlled = true; 
                 }
             }
         }
@@ -59,10 +59,8 @@ function setupConnection(conn) {
         if (gameState.playerRole === 'alien-master') {
             if (data.type === 'SEED_STOLEN') {
                 gameState.alienMasterSeeds++;
-                console.log(`An alien collected a seed! Spawns available: ${gameState.alienMasterSeeds}`);
             }
             if (data.type === 'SYNC_ENEMIES') {
-                // Instantly absorb her exact updated physics tracking calculations
                 gameState.enemies = data.enemies;
             }
             if (data.type === 'SYNC_FARMER') {
@@ -78,6 +76,12 @@ function setupConnection(conn) {
                 gameState.activeGrenades = data.activeGrenades;
                 gameState.carryingGrenade = data.carryingGrenade;
                 gameState.guns = data.guns;
+                
+                // FIXED: Sync her hotbar parameters down to your screen monitor layout
+                gameState.activeSlot = data.activeSlot;
+                gameState.inventory = data.inventory;
+                gameState.hasScythe = data.hasScythe;
+                gameState.hasGun = data.hasGun;
             }
         }
     });

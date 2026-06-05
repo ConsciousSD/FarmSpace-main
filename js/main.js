@@ -140,7 +140,6 @@ function gameLoop() {
     if (gameState.gunCoolDownActive && gameState.killsSinceEmpty >= 10) { gameState.gunCoolDownActive = false; gameState.killsSinceEmpty = 0; }
 
     // --- ENEMIES LAYER ---
-    // FIXED: Changed 'length - i' back to 'length - 1' to resolve infinite browser freeze loops
     for (let i = gameState.enemies.length - 1; i >= 0; i--) {
         let en = gameState.enemies[i];
         if (!en) continue;
@@ -173,10 +172,8 @@ function gameLoop() {
 
             en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
             
-            // FIXED: Correctly evaluate local asset strings to map graphics sheets dynamically
             let enemyImage = en.img; 
 
-            // Network synchronization fallback guard
             if (!enemyImage) {
                 if (en.type === 2) enemyImage = enemyDeathSprite2; 
                 else if (en.type === 3) enemyImage = chickenSprite; 
@@ -315,6 +312,7 @@ function gameLoop() {
             enemies: gameState.enemies.map(en => ({ id: en.id, x: en.x, y: en.y, type: en.type, fIdx: en.fIdx }))
         });
 
+        // FIXED: Expanded the payload variables package to cleanly send weapon state down to your tab screen!
         gameState.peerConnection.send({
             type: 'SYNC_FARMER',
             playerX: gameState.playerX,
@@ -328,7 +326,13 @@ function gameLoop() {
             grenadesOnGround: gameState.grenadesOnGround,
             activeGrenades: gameState.activeGrenades,
             carryingGrenade: gameState.carryingGrenade,
-            guns: gameState.guns
+            guns: gameState.guns,
+            
+            // Sync inventory data blocks
+            activeSlot: gameState.activeSlot,
+            inventory: gameState.inventory,
+            hasScythe: gameState.hasScythe,
+            hasGun: gameState.hasGun
         });
     }
 
