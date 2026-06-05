@@ -5,36 +5,52 @@ import { player } from './player.js';
 
 export function initInput() {
     window.onkeydown = e => {
-        // FIXED: Explicit safety guard to prevent toLowerCase crashing on unusual system events
         if (!e || !e.key) return; 
         let k = e.key.toLowerCase();
 
         // =======================================================
-        // 🛸 ALIEN MASTER CONTROLS (SEPARATED TO PREVENT FREEZING)
+        // 🛸 ALIEN MASTER CONTROLS (SAFETY HARDENED)
         // =======================================================
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
-            // Key S spawns an alien ONLY if you have a spawn credit ready
             if (k === 's') {
-                if (gameState.alienMasterSeeds > 0 && gameState.peerConnection) {
-                    gameState.alienMasterSeeds--;
-                    gameState.peerConnection.send({
-                        type: 'SPAWN_ALIEN',
-                        id: Math.random().toString(36).substr(2, 9), 
-                        enemyType: Math.floor(Math.random() * 3) + 1,
-                        x: 1250,
-                        y: 1250
-                    });
-                    console.log("Alien Master successfully spawned an alien wave!");
+                if (gameState.alienMasterSeeds > 0) {
+                    // Safety check: Is the network channel fully active?
+                    if (gameState.peerConnection && gameState.peerConnection.open) {
+                        gameState.alienMasterSeeds--;
+                        gameState.peerConnection.send({
+                            type: 'SPAWN_ALIEN',
+                            id: "alien-" + Math.random().toString(36).substr(2, 9), 
+                            enemyType: Math.floor(Math.random() * 3) + 1,
+                            x: 1250,
+                            y: 1250
+                        });
+                        console.log("Alien Master successfully spawned an alien wave!");
+                    } else {
+                        // If PeerJS is still connecting, wait 500ms and try sending the packet again automatically!
+                        console.log("Network pipeline establishing connection... Retrying spawn shortly.");
+                        setTimeout(() => {
+                            if (gameState.peerConnection && gameState.peerConnection.open) {
+                                gameState.alienMasterSeeds--;
+                                gameState.peerConnection.send({
+                                    type: 'SPAWN_ALIEN',
+                                    id: "alien-" + Math.random().toString(36).substr(2, 9), 
+                                    enemyType: Math.floor(Math.random() * 3) + 1,
+                                    x: 1250,
+                                    y: 1250
+                                });
+                            }
+                        }, 500);
+                    }
                 } else {
-                    console.log("Cannot spawn! Wait for aliens to steal seeds on her screen.");
+                    console.log("Cannot spawn! Your commodities pool is empty. Wait for aliens to steal seeds.");
                 }
             }
 
             // Arrow keys move your possessed alien across the board
-            if (gameState.controlledEnemyId && gameState.peerConnection) {
+            if (gameState.controlledEnemyId && gameState.peerConnection && gameState.peerConnection.open) {
                 let activeAlien = gameState.enemies.find(en => en.id === gameState.controlledEnemyId);
                 if (activeAlien) {
-                    let alienSpeed = 35; // Manual driven speed
+                    let alienSpeed = 35; 
                     if (e.key === 'ArrowUp') activeAlien.y -= alienSpeed;
                     if (e.key === 'ArrowDown') activeAlien.y += alienSpeed;
                     if (e.key === 'ArrowLeft') activeAlien.x -= alienSpeed;
@@ -48,7 +64,7 @@ export function initInput() {
                     });
                 }
             }
-            return; // 🛑 CRITICAL: Exits loop here so the Master never runs farmer gun mechanics!
+            return; // 🛑 Prevents bleeding into farmer gun mechanics
         }
 
         // =======================================================
@@ -138,7 +154,6 @@ export function initInput() {
     };
 
     window.onkeyup = e => {
-        // FIXED: Safety guard to prevent toLowerCase crashes here as well
         if (!e || !e.key) return; 
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') return;
 
@@ -153,7 +168,7 @@ export function initInput() {
     };
 
     // =======================================================
-    // FORGIVING LEFT-CLICK SELECTION HITBOX MATH
+    // LEFT-CLICK SELECTION MATH
     // =======================================================
     window.addEventListener('mousedown', e => {
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
@@ -162,7 +177,6 @@ export function initInput() {
             const clickY = (e.clientY - rect.top) * (2500 / rect.height);
 
             if (e.button === 0) { 
-                // Checks if click coordinates fall within clean distance radius from alien center origin
                 let clickedAlien = gameState.enemies.find(en => {
                     let distance = Math.hypot((en.x + 144) - clickX, (en.y + 144) - clickY);
                     return distance < 180; 
