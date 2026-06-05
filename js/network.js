@@ -26,21 +26,31 @@ function setupConnection(conn) {
     console.log("Direct P2P multiplayer link synchronized!");
 
     conn.on('data', (data) => {
+        if (!data || !data.type) return;
+
         // --- SURVIVOR (WIFE / FARMER) SIDE INTERCEPTS PACKETS ---
         if (gameState.playerRole === 'farmer') {
             if (data.type === 'SPAWN_ALIEN') {
+                console.log(`Master requested spawn: Type ${data.enemyType} at [${data.x}, ${data.y}]`);
+                
+                // Call your native internal game helper function to configure stats
                 const newEnemy = createEnemy(data.enemyType);
-                newEnemy.id = data.id; 
-                newEnemy.x = data.x;
-                newEnemy.y = data.y;
-                gameState.enemies.push(newEnemy);
+                if (newEnemy) {
+                    newEnemy.id = data.id; 
+                    newEnemy.x = data.x;
+                    newEnemy.y = data.y;
+                    newEnemy.isLocallyControlled = false; // Starts tracking her automatically
+
+                    // FIXED: Force her engine to push the new unit into the live array stack
+                    gameState.enemies.push(newEnemy);
+                }
             }
             if (data.type === 'CONTROL_MOVE') {
                 let targetedAlien = gameState.enemies.find(e => e.id === data.id);
                 if (targetedAlien) {
                     targetedAlien.x = data.x;
                     targetedAlien.y = data.y;
-                    targetedAlien.isLocallyControlled = true; 
+                    targetedAlien.isLocallyControlled = true; // Hijacks normal automatic tracking
                 }
             }
         }
@@ -52,9 +62,9 @@ function setupConnection(conn) {
                 console.log(`An alien collected a seed! Spawns available: ${gameState.alienMasterSeeds}`);
             }
             if (data.type === 'SYNC_ENEMIES') {
+                // Instantly absorb her exact updated physics tracking calculations
                 gameState.enemies = data.enemies;
             }
-            // FIXED: Fully synchronized mirror to unpack livestock, weapons, and pickups
             if (data.type === 'SYNC_FARMER') {
                 gameState.playerX = data.playerX;
                 gameState.playerY = data.playerY;
