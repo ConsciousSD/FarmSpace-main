@@ -140,7 +140,8 @@ function gameLoop() {
     if (gameState.gunCoolDownActive && gameState.killsSinceEmpty >= 10) { gameState.gunCoolDownActive = false; gameState.killsSinceEmpty = 0; }
 
     // --- ENEMIES LAYER ---
-    for (let i = gameState.enemies.length - i; i >= 0; i--) {
+    // FIXED: Changed 'length - i' back to 'length - 1' to resolve infinite browser freeze loops
+    for (let i = gameState.enemies.length - 1; i >= 0; i--) {
         let en = gameState.enemies[i];
         if (!en) continue;
 
@@ -172,13 +173,15 @@ function gameLoop() {
 
             en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
             
-            // =======================================================
-            // FIXED: LOCAL MULTIPLAYER HARD ASSET MAPPING
-            // =======================================================
-            let enemyImage;
-            if (en.type === 2) { enemyImage = enemyDeathSprite2; } 
-            else if (en.type === 3) { enemyImage = chickenSprite; } 
-            else { enemyImage = ak47Idle; } // Falls back cleanly to local variables instead of raw network links
+            // FIXED: Correctly evaluate local asset strings to map graphics sheets dynamically
+            let enemyImage = en.img; 
+
+            // Network synchronization fallback guard
+            if (!enemyImage) {
+                if (en.type === 2) enemyImage = enemyDeathSprite2; 
+                else if (en.type === 3) enemyImage = chickenSprite; 
+                else enemyImage = corralSprite; 
+            }
 
             if (en.type === 2) ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
             else if (en.type === 3) ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
