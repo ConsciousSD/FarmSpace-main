@@ -1,0 +1,27 @@
+export const canvas = document.getElementById('canvas1');
+export const ctx = canvas.getContext('2d');
+export const CANVAS_WIDTH = canvas.width = 2500;
+export const CANVAS_HEIGHT = canvas.height = 2500;
+
+ctx.imageSmoothingEnabled = false;
+
+export const gameState = {
+    playerX: 1250, playerY: 1250,
+    moveUp: false, moveDown: false, moveLeft: false, moveRight: false,
+    isShooting: false, isMoving: false, gameFrame: 0,
+    seedInventory: 0, enemyKillScore: 0, ammo: 0,
+    hasGun: false, gunCoolDownActive: false, killsSinceEmpty: 0,
+    isPowered: false, powerTimer: 0, isPaused: false, isGameOver: false,
+    
+    pigs: [], carryingPig: null, pigsSaved: 0, lastPigSoundTime: 0,
+    chickens: [], carryingChicken: null, chickensSaved: 0,
+    enemies: [], seeds: [], plantedWatermelons: [], tires: [], guns: [],
+    grenadesOnGround: [], activeGrenades: [], carryingGrenade: false,
+    
+    highScore: localStorage.getItem('farmSpaceHighScore') || 0,
+    pigHighScore: localStorage.getItem('farmSpacePigHighScore') || 0,
+    chickenHighScore: localStorage.getItem('farmSpaceChickenHighScore') || 0,
+    
+    spawnRateMultiplier: 1.0,
+    corral: { x: 20, y: (CANVAS_HEIGHT / 2) - 150, width: 300, height: 300 }
+};
