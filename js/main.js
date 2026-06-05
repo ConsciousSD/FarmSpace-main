@@ -50,8 +50,14 @@ function gameLoop() {
     });
 
     // --- PLAYER DRAW LAYER ---
-    // Only process farmer graphics frames if not acting as the external observer master client
-    if (!(gameState.isMultiplayer && gameState.playerRole === 'alien-master')) {
+    // FIXED: Draws and flips the farmer avatar properly on both game client monitors
+    if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
+        player.x = gameState.playerX;
+        player.y = gameState.playerY;
+        if (gameState.moveLeft) player.facingRight = false;
+        if (gameState.moveRight) player.facingRight = true;
+        player.draw(ctx);
+    } else {
         player.update();
         player.draw(ctx);
     }
@@ -293,11 +299,27 @@ function gameLoop() {
         ctx.fillStyle = 'yellow'; let rem = Math.max(0, Math.ceil((10000 - (now - gameState.powerTimer)) / 1000)); ctx.fillText(`TRACTOR: ${rem}s`, 350, 60);
     }
 
-    // Continuous-ping arrays from the survivor client to sync positions onto the commander monitor
+    // FIXED: Broadcast complete package variables (livestock, weapons, points) from survivor client down to the commander monitor
     if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.gameFrame % 3 === 0) {
         gameState.peerConnection.send({
             type: 'SYNC_ENEMIES',
             enemies: gameState.enemies.map(en => ({ id: en.id, x: en.x, y: en.y, type: en.type, fIdx: en.fIdx }))
+        });
+
+        gameState.peerConnection.send({
+            type: 'SYNC_FARMER',
+            playerX: gameState.playerX,
+            playerY: gameState.playerY,
+            plowedPatches: gameState.plowedPatches,
+            plantedWatermelons: gameState.plantedWatermelons,
+            seeds: gameState.seeds,
+            pigs: gameState.pigs,
+            chickens: gameState.chickens,
+            charms: gameState.charms,
+            grenadesOnGround: gameState.grenadesOnGround,
+            activeGrenades: gameState.activeGrenades,
+            carryingGrenade: gameState.carryingGrenade,
+            guns: gameState.guns
         });
     }
 

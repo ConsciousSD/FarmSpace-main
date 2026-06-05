@@ -26,7 +26,7 @@ function setupConnection(conn) {
     console.log("Direct P2P multiplayer link synchronized!");
 
     conn.on('data', (data) => {
-        // --- SURVIVOR (WIFE) SIDE INTERCEPTS PACKETS ---
+        // --- SURVIVOR (WIFE / FARMER) SIDE INTERCEPTS PACKETS ---
         if (gameState.playerRole === 'farmer') {
             if (data.type === 'SPAWN_ALIEN') {
                 const newEnemy = createEnemy(data.enemyType);
@@ -53,6 +53,21 @@ function setupConnection(conn) {
             }
             if (data.type === 'SYNC_ENEMIES') {
                 gameState.enemies = data.enemies;
+            }
+            // FIXED: Fully synchronized mirror to unpack livestock, weapons, and pickups
+            if (data.type === 'SYNC_FARMER') {
+                gameState.playerX = data.playerX;
+                gameState.playerY = data.playerY;
+                gameState.plowedPatches = data.plowedPatches;
+                gameState.plantedWatermelons = data.plantedWatermelons;
+                gameState.seeds = data.seeds;
+                gameState.pigs = data.pigs;
+                gameState.chickens = data.chickens;
+                gameState.charms = data.charms;
+                gameState.grenadesOnGround = data.grenadesOnGround;
+                gameState.activeGrenades = data.activeGrenades;
+                gameState.carryingGrenade = data.carryingGrenade;
+                gameState.guns = data.guns;
             }
         }
     });
