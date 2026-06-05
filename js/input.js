@@ -7,8 +7,11 @@ export function initInput() {
     window.onkeydown = e => {
         let k = e.key.toLowerCase();
 
-        // --- ALIEN MASTER MODE CONTROL INTERCEPTIONS ---
+        // =======================================================
+        // 🛸 ALIEN MASTER CONTROLS (SEPARATED TO PREVENT FREEZING)
+        // =======================================================
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
+            // Key S spawns an alien ONLY if you have a spawn credit ready
             if (k === 's') {
                 if (gameState.alienMasterSeeds > 0 && gameState.peerConnection) {
                     gameState.alienMasterSeeds--;
@@ -19,15 +22,17 @@ export function initInput() {
                         x: 1250,
                         y: 1250
                     });
+                    console.log("Alien Master successfully spawned an alien wave!");
                 } else {
-                    console.log("Cannot spawn! Your aliens must collect a seed resource first.");
+                    console.log("Cannot spawn! Wait for aliens to steal seeds on her screen.");
                 }
             }
 
+            // Arrow keys move your possessed alien across the board
             if (gameState.controlledEnemyId && gameState.peerConnection) {
                 let activeAlien = gameState.enemies.find(en => en.id === gameState.controlledEnemyId);
                 if (activeAlien) {
-                    let alienSpeed = 25; // Snappy speed for active tracking steering
+                    let alienSpeed = 35; // Snappy drive speed
                     if (e.key === 'ArrowUp') activeAlien.y -= alienSpeed;
                     if (e.key === 'ArrowDown') activeAlien.y += alienSpeed;
                     if (e.key === 'ArrowLeft') activeAlien.x -= alienSpeed;
@@ -41,10 +46,12 @@ export function initInput() {
                     });
                 }
             }
-            return; 
+            return; // 🛑 CRITICAL: Stops execution here so your game never executes farmer gun logic!
         }
 
-        // --- STANDARD SURVIVOR CONTROLS ---
+        // =======================================================
+        // 👩‍🌾 STANDARD SURVIVOR (FARMER) CONTROLS
+        // =======================================================
         if (gameAudio.paused) gameAudio.play();
         if (k === 'r' && gameState.isGameOver) location.reload();
         if (k === 'arrowup') gameState.moveUp = true; if (k === 'arrowdown') gameState.moveDown = true;
@@ -129,7 +136,9 @@ export function initInput() {
     };
 
     window.onkeyup = e => {
+        // Stop Alien Master keyups from bleeding into weapon lists
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') return;
+
         let k = e.key.toLowerCase();
         if (k === 'arrowup') gameState.moveUp = false; if (k === 'arrowdown') gameState.moveDown = false;
         if (k === 'arrowleft') gameState.moveLeft = false; if (k === 'arrowright') gameState.moveRight = false;
@@ -140,7 +149,9 @@ export function initInput() {
         }
     };
 
-    // --- ALIEN MASTER LEFT-CLICK MIND CONTROL SELECTOR ---
+    // =======================================================
+    // LEFT-CLICK SELECTION MATH
+    // =======================================================
     window.addEventListener('mousedown', e => {
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
             const rect = canvas.getBoundingClientRect();
@@ -149,13 +160,13 @@ export function initInput() {
 
             if (e.button === 0) { 
                 let clickedAlien = gameState.enemies.find(en => {
-                    return clickX >= en.x && clickX <= en.x + 288 &&
-                           clickY >= en.y && clickY <= en.y + 288;
+                    let distance = Math.hypot((en.x + 144) - clickX, (en.y + 144) - clickY);
+                    return distance < 180; 
                 });
 
                 if (clickedAlien) {
                     gameState.controlledEnemyId = clickedAlien.id;
-                    console.log(`Direct mind control hijacked target ID: ${clickedAlien.id}`);
+                    console.log(`Successfully mind-controlled target alien: ${clickedAlien.id}`);
                 }
             }
         }
