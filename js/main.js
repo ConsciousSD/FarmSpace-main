@@ -11,8 +11,71 @@ setInterval(() => {
 }, 60000);
 
 function gameLoop() {
-    if (gameState.isPaused) return requestAnimationFrame(gameLoop);
+    // FIXED: Instead of an instant hard return that breaks the canvas drawing frame pipeline, 
+    // we clear and draw static UI/background layers first, then break before physics and entity updates!
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // --- BASE BACKGROUND LAYER ---
+    ctx.drawImage(corralSprite, gameState.corral.x, gameState.corral.y, gameState.corral.width, gameState.corral.height);
+
+    gameState.plowedPatches.forEach(patch => {
+        ctx.fillStyle = '#5c4033'; 
+        ctx.fillRect(patch.x, patch.y, patch.size, patch.size);
+        ctx.strokeStyle = '#4a3329';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(patch.x, patch.y, patch.size, patch.size);
+    });
+
+    // --- GAME ITEMS & REWARDS LAYER ---
+    gameState.grenadesOnGround.forEach(g => {
+        let pulse = Math.sin(gameState.gameFrame * 0.1) * 5;
+        ctx.drawImage(grenadeSprite, g.x - pulse, g.y - pulse, 160 + pulse * 2, 160 + pulse * 2);
+    });
+
+    // --- PLAYER DRAW LAYER ---
+    player.update();
+    player.draw(ctx);
+
+    // --- HOTBAR HUD & OVERLAY SYSTEMS ---
+    let boxSize = 80;
+    let boxPadding = 15;
+    let totalWidth = (boxSize * 5) + (boxPadding * 4);
+    let startX = (CANVAS_WIDTH / 2) - (totalWidth / 2);
+    let startY = 30; 
+
+    for (let j = 0; j < 5; j++) {
+        let boxX = startX + (j * (boxSize + boxPadding));
+        if (j === gameState.activeSlot) {
+            ctx.fillStyle = 'rgba(230, 180, 40, 0.85)'; 
+            ctx.fillRect(boxX - 4, startY - 4, boxSize + 8, boxSize + 8);
+            ctx.fillStyle = 'rgba(60, 50, 40, 0.9)'; 
+        } else {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; 
+            ctx.fillRect(boxX - 2, startY - 2, boxSize + 4, boxSize + 4);
+            ctx.fillStyle = 'rgba(20, 20, 20, 0.8)'; 
+        }
+        ctx.fillRect(boxX, startY, boxSize, boxSize);
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.font = '22px Arial';
+        ctx.fillText(j + 1, boxX + 8, startY + 24);
+
+        let item = gameState.inventory[j];
+        if (item === 'scythe') {
+            ctx.drawImage(scytheSprite, boxX + 10, startY + 10, boxSize - 20, boxSize - 20);
+        } else if (item === 'gun') {
+            ctx.drawImage(ak47Idle, boxX + 5, startY + 5, boxSize - 10, boxSize - 10);
+        }
+    }
+
+    // FIXED: Pause gate relocated right here!
+    // This allows the background grid and layout tables to render continuously on screen,
+    // ensuring the popup can freeze gameplay components without causing canvas crashes.
+    if (gameState.isPaused) {
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+
     gameState.gameFrame++;
 
     if (gameState.isGameOver) {
@@ -28,25 +91,6 @@ function gameLoop() {
         return;
     }
 
-    // --- BASE BACKGROUND LAYER ---
-    ctx.drawImage(corralSprite, gameState.corral.x, gameState.corral.y, gameState.corral.width, gameState.corral.height);
-
-    gameState.plowedPatches.forEach(patch => {
-        ctx.fillStyle = '#5c4033'; // Rich brown "dirt" color
-        ctx.fillRect(patch.x, patch.y, patch.size, patch.size);
-
-        // Optional: Add a dark border to give the square definition
-        ctx.strokeStyle = '#4a3329';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(patch.x, patch.y, patch.size, patch.size);
-    });
-
-    // --- GAME ITEMS & REWARDS LAYER ---
-    gameState.grenadesOnGround.forEach(g => {
-        let pulse = Math.sin(gameState.gameFrame * 0.1) * 5;
-        ctx.drawImage(grenadeSprite, g.x - pulse, g.y - pulse, 160 + pulse * 2, 160 + pulse * 2);
-    });
-
     if (gameState.isPowered && Date.now() - gameState.powerTimer > 10000) gameState.isPowered = false;
 
     let speed = gameState.isPowered ? 12 : 6;
@@ -57,11 +101,6 @@ function gameLoop() {
     gameState.isMoving = (gameState.moveLeft || gameState.moveRight || gameState.moveUp || gameState.moveDown);
     if (gameState.isMoving) moveSound.play(); else moveSound.pause();
 
-    // --- PLAYER DRAW LAYER ---
-    player.update();
-    player.draw(ctx);
-
-    // FIXED: Refactored Weapon pickups to fill open slots dynamically
     gameState.guns.forEach((g, i) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 600, 600);
         if (checkCollision(player, { x: g.x, y: g.y, width: 600, height: 600, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { 
@@ -73,7 +112,6 @@ function gameLoop() {
                 let emptySlot = gameState.inventory.indexOf(null);
                 if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun';
             }
-            // Live status sync
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun');
             gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
         }
@@ -87,7 +125,6 @@ function gameLoop() {
         if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { gameState.isPowered = true; gameState.powerTimer = Date.now(); gameState.tires.splice(i, 1); tirePickupSound.play(); }
     });
 
-    // FIXED: Refactored Scythe pickups to fill open slots dynamically
     gameState.scythes.forEach((s, i) => {
         ctx.drawImage(scytheSprite, s.x, s.y, 300, 300);
         if (checkCollision(player, { x: s.x, y: s.y, width: 300, height: 300, hitboxOffsetX: 30, hitboxOffsetY: 30 }, true)) {
@@ -98,7 +135,6 @@ function gameLoop() {
                 let emptySlot = gameState.inventory.indexOf(null);
                 if (emptySlot !== -1) gameState.inventory[emptySlot] = 'scythe';
             }
-            // Live status sync
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun');
             gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
         }
@@ -215,7 +251,7 @@ function gameLoop() {
     gameState.activeGrenades.forEach((g, i) => {
         if (!g.exploded) {
             g.x += g.vX; g.y += g.vY; g.vY += 0.6; g.timer--;
-            ctx.save(); ctx.translate(g.x, g.y); ctx.rotate(gameState.gameFrame * 0.3);
+            ctx.save(); ctx.translate(g.vX, g.y); ctx.rotate(gameState.gameFrame * 0.3);
             ctx.drawImage(grenadeSprite, -80, -80, 160, 160);
             ctx.restore();
             if (g.timer <= 0) {
@@ -230,7 +266,7 @@ function gameLoop() {
 
     if (gameState.carryingGrenade) ctx.drawImage(grenadeSprite, gameState.playerX + (player.facingRight ? 200 : -20), gameState.playerY + 80, 160, 160);
 
-    // --- HUD & METRICS OVERLAY ---
+    // --- HUD AREA TEXT DISPLAY ---
     ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(10, 10, 850, 240);
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
     ctx.fillText(`Seeds: ${gameState.seedInventory} | Kills: ${gameState.enemyKillScore} | Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved}`, 30, 60);
@@ -243,39 +279,6 @@ function gameLoop() {
     if (gameState.isPowered) {
         ctx.fillStyle = 'yellow'; let rem = Math.max(0, Math.ceil((10000 - (now - gameState.powerTimer)) / 1000));
         ctx.fillText(`TRACTOR: ${rem}s`, 350, 60);
-    }
-
-    // FIXED: Render the visual 5-slot Hotbar HUD table directly onto top middle area
-    let boxSize = 80;
-    let boxPadding = 15;
-    let totalWidth = (boxSize * 5) + (boxPadding * 4);
-    let startX = (CANVAS_WIDTH / 2) - (totalWidth / 2);
-    let startY = 30; 
-
-    for (let j = 0; j < 5; j++) {
-        let boxX = startX + (j * (boxSize + boxPadding));
-
-        if (j === gameState.activeSlot) {
-            ctx.fillStyle = 'rgba(230, 180, 40, 0.85)'; 
-            ctx.fillRect(boxX - 4, startY - 4, boxSize + 8, boxSize + 8);
-            ctx.fillStyle = 'rgba(60, 50, 40, 0.9)'; 
-        } else {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; 
-            ctx.fillRect(boxX - 2, startY - 2, boxSize + 4, boxSize + 4);
-            ctx.fillStyle = 'rgba(20, 20, 20, 0.8)'; 
-        }
-        ctx.fillRect(boxX, startY, boxSize, boxSize);
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.font = '22px Arial';
-        ctx.fillText(j + 1, boxX + 8, startY + 24);
-
-        let item = gameState.inventory[j];
-        if (item === 'scythe') {
-            ctx.drawImage(scytheSprite, boxX + 10, startY + 10, boxSize - 20, boxSize - 20);
-        } else if (item === 'gun') {
-            ctx.drawImage(ak47Idle, boxX + 5, startY + 5, boxSize - 10, boxSize - 10);
-        }
     }
 
     requestAnimationFrame(gameLoop);
@@ -309,14 +312,11 @@ function startGame() {
     initInput();
     spawnTick();
 
-    // FIXED: Initialize Box 1 (index 0) with Scythe right at launch
     gameState.inventory[0] = 'scythe';
     gameState.hasScythe = true;
 
-    // Spawn an initial scythe close to the player's starting area for immediate testing
     gameState.scythes.push({ x: 1500, y: 1300 });
 
-    // EXISTING INTERVALS
     setInterval(() => { if (!gameState.isGameOver && gameState.seeds.length < 5) gameState.seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 12000);
     setInterval(() => {
         if (!gameState.isGameOver && gameState.pigs.length < 5 && !gameState.isPaused) gameState.pigs.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 });
@@ -332,7 +332,6 @@ function startGame() {
         }
     }, 5000);
 
-    // New interval to drop a replacement scythe every 30 seconds if the player doesn't have one and none are on the ground
     setInterval(() => {
         if (!gameState.isGameOver && !gameState.hasScythe && gameState.scythes.length < 1) {
             gameState.scythes.push({ x: Math.random() * 2000 + 100, y: Math.random() * 2000 + 100 });
@@ -341,6 +340,10 @@ function startGame() {
 
     gameLoop();
 }
+
+// FIXED: Initialize input tracking IMMEDIATELY on script evaluation rather than hiding it inside startGame()
+// This ensures click events for buttons like "How to Play" register right on main menu launch!
+initInput();
 
 startButton.addEventListener('click', startGame);
 window.addEventListener('keydown', e => { if (e.key === 'Enter') startGame(); });

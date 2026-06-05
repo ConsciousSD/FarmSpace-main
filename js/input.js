@@ -30,7 +30,7 @@ export function initInput() {
             }
         }
 
-        // FIXED: Key 'A' now specifically handles plowing the ground
+        // Key 'A' specifically handles plowing the ground
         if (k === 'a') {
             if (gameState.hasScythe) {
                 // 1. Calculate tile coordinates centered near player feet
@@ -48,7 +48,7 @@ export function initInput() {
             }
         }
 
-        // FIXED: Spacebar now ONLY plants watermelons if standing inside a plowed patch
+        // Spacebar now ONLY plants watermelons if standing inside a plowed patch
         if (k === ' ') {
             if (gameState.seedInventory > 0) {
                 let playerFeetX = gameState.playerX + 144; // Mid-axis of player footprint
@@ -116,4 +116,31 @@ export function initInput() {
             gameState.activeGrenades.push({ x: gameState.playerX + 144, y: gameState.playerY + 144, vX: player.facingRight ? 18 : -18, vY: -12, timer: 50, exploded: false });
         }
     };
+
+    // FIXED: Hooked up DOM listeners to run the Manual modal window
+    const modal = document.getElementById('instructions-modal');
+    const openBtn = document.getElementById('help-button');
+    const closeBtn = document.getElementById('close-modal-btn');
+
+    if (openBtn && modal && closeBtn) {
+        // Tapping button freezes the environment layout metrics and blurs background
+        openBtn.addEventListener('click', () => {
+            modal.style.display = 'flex';
+            gameState.isPaused = true;
+        });
+
+        // Unfreezes engine frames and hides manual overlay card
+        closeBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+            gameState.isPaused = false;
+        });
+
+        // Click outside the box container boundary fallback
+        window.addEventListener('click', e => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+                gameState.isPaused = false;
+            }
+        });
+    }
 }
