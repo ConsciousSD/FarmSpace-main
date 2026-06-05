@@ -140,8 +140,10 @@ function gameLoop() {
     if (gameState.gunCoolDownActive && gameState.killsSinceEmpty >= 10) { gameState.gunCoolDownActive = false; gameState.killsSinceEmpty = 0; }
 
     // --- ENEMIES LAYER ---
-    for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+    for (let i = gameState.enemies.length - i; i >= 0; i--) {
         let en = gameState.enemies[i];
+        if (!en) continue;
+
         if (en.isDying) {
             en.deathTimer++; if (en.deathTimer % 6 === 0) en.deathFrame++;
             if (en.deathFrame < 6) {
@@ -169,9 +171,18 @@ function gameLoop() {
             });
 
             en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
-            if (en.type === 2) ctx.drawImage(en.img, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
-            else if (en.type === 3) ctx.drawImage(en.img, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
-            else ctx.drawImage(en.img, en.fIdx * 288, 0, 288, 288, en.x, en.y, 288, 288);
+            
+            // =======================================================
+            // FIXED: LOCAL MULTIPLAYER HARD ASSET MAPPING
+            // =======================================================
+            let enemyImage;
+            if (en.type === 2) { enemyImage = enemyDeathSprite2; } 
+            else if (en.type === 3) { enemyImage = chickenSprite; } 
+            else { enemyImage = ak47Idle; } // Falls back cleanly to local variables instead of raw network links
+
+            if (en.type === 2) ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
+            else if (en.type === 3) ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
+            else ctx.drawImage(enemyImage, en.fIdx * 288, 0, 288, 288, en.x, en.y, 288, 288);
 
             if (gameState.isMultiplayer && gameState.controlledEnemyId === en.id) {
                 ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(en.x + 144, en.y + 144, 150, 0, Math.PI * 2); ctx.stroke();
@@ -371,22 +382,22 @@ joinMasterBtn.addEventListener('click', () => {
     if (!roomCode) return alert("Please enter a room code first!");
     initMultiplayer('alien-master', roomCode);
     
-    // Give the master a seed spawn point instantly
     gameState.alienMasterSeeds = 1;
 
-    // Drop an active basic scout right away
     setTimeout(() => {
         if (gameState.peerConnection) {
+            let starterId = "starter-alien-" + Math.floor(Math.random() * 1000);
             gameState.peerConnection.send({
                 type: 'SPAWN_ALIEN',
-                id: Math.random().toString(36).substr(2, 9),
+                id: starterId,
                 enemyType: 1,
                 x: 1250,
                 y: 1250
             });
-            console.log("Starter alien spawned for the Master Commander!");
+            gameState.controlledEnemyId = starterId;
+            console.log("Starter alien spawned and possessed!");
         }
-    }, 1000);
+    }, 1200);
 
     startScreen.style.display = 'none';
     initInput();

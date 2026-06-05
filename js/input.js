@@ -5,6 +5,8 @@ import { player } from './player.js';
 
 export function initInput() {
     window.onkeydown = e => {
+        // FIXED: Explicit safety guard to prevent toLowerCase crashing on unusual system events
+        if (!e || !e.key) return; 
         let k = e.key.toLowerCase();
 
         // =======================================================
@@ -32,7 +34,7 @@ export function initInput() {
             if (gameState.controlledEnemyId && gameState.peerConnection) {
                 let activeAlien = gameState.enemies.find(en => en.id === gameState.controlledEnemyId);
                 if (activeAlien) {
-                    let alienSpeed = 35; // Snappy drive speed
+                    let alienSpeed = 35; // Manual driven speed
                     if (e.key === 'ArrowUp') activeAlien.y -= alienSpeed;
                     if (e.key === 'ArrowDown') activeAlien.y += alienSpeed;
                     if (e.key === 'ArrowLeft') activeAlien.x -= alienSpeed;
@@ -46,7 +48,7 @@ export function initInput() {
                     });
                 }
             }
-            return; // 🛑 CRITICAL: Stops execution here so your game never executes farmer gun logic!
+            return; // 🛑 CRITICAL: Exits loop here so the Master never runs farmer gun mechanics!
         }
 
         // =======================================================
@@ -136,7 +138,8 @@ export function initInput() {
     };
 
     window.onkeyup = e => {
-        // Stop Alien Master keyups from bleeding into weapon lists
+        // FIXED: Safety guard to prevent toLowerCase crashes here as well
+        if (!e || !e.key) return; 
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') return;
 
         let k = e.key.toLowerCase();
@@ -150,7 +153,7 @@ export function initInput() {
     };
 
     // =======================================================
-    // LEFT-CLICK SELECTION MATH
+    // FORGIVING LEFT-CLICK SELECTION HITBOX MATH
     // =======================================================
     window.addEventListener('mousedown', e => {
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
@@ -159,6 +162,7 @@ export function initInput() {
             const clickY = (e.clientY - rect.top) * (2500 / rect.height);
 
             if (e.button === 0) { 
+                // Checks if click coordinates fall within clean distance radius from alien center origin
                 let clickedAlien = gameState.enemies.find(en => {
                     let distance = Math.hypot((en.x + 144) - clickX, (en.y + 144) - clickY);
                     return distance < 180; 
