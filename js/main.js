@@ -50,7 +50,6 @@ function gameLoop() {
     });
 
     // --- PLAYER DRAW LAYER ---
-    // FIXED: Draws and flips the farmer avatar properly on both game client monitors
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
         player.x = gameState.playerX;
         player.y = gameState.playerY;
@@ -155,13 +154,11 @@ function gameLoop() {
             let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
             let moveDir = (gameState.isPowered || (gameState.hasGun && gameState.isShooting)) ? -1 : 1;
             
-            // Block native tracking algorithm from running over your custom arrow key coordinates
             if (!en.isLocallyControlled) {
                 en.x += (dx / dist) * en.speed * moveDir; 
                 en.y += (dy / dist) * en.speed * moveDir;
             }
 
-            // Allow aliens to step on ground seeds to steal them and fund your master balance
             gameState.seeds.forEach((s, sIdx) => {
                 if (Math.hypot((en.x + 144) - s.x, (en.y + 144) - s.y) < 150) {
                     gameState.seeds.splice(sIdx, 1);
@@ -176,7 +173,6 @@ function gameLoop() {
             else if (en.type === 3) ctx.drawImage(en.img, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
             else ctx.drawImage(en.img, en.fIdx * 288, 0, 288, 288, en.x, en.y, 288, 288);
 
-            // Draw a distinct neon ring highlight boundary circle on top of whatever monster you are driving
             if (gameState.isMultiplayer && gameState.controlledEnemyId === en.id) {
                 ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(en.x + 144, en.y + 144, 150, 0, Math.PI * 2); ctx.stroke();
             }
@@ -299,7 +295,6 @@ function gameLoop() {
         ctx.fillStyle = 'yellow'; let rem = Math.max(0, Math.ceil((10000 - (now - gameState.powerTimer)) / 1000)); ctx.fillText(`TRACTOR: ${rem}s`, 350, 60);
     }
 
-    // FIXED: Broadcast complete package variables (livestock, weapons, points) from survivor client down to the commander monitor
     if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.gameFrame % 3 === 0) {
         gameState.peerConnection.send({
             type: 'SYNC_ENEMIES',
@@ -375,6 +370,24 @@ joinMasterBtn.addEventListener('click', () => {
     const roomCode = roomCodeInput.value.trim().toLowerCase();
     if (!roomCode) return alert("Please enter a room code first!");
     initMultiplayer('alien-master', roomCode);
+    
+    // Give the master a seed spawn point instantly
+    gameState.alienMasterSeeds = 1;
+
+    // Drop an active basic scout right away
+    setTimeout(() => {
+        if (gameState.peerConnection) {
+            gameState.peerConnection.send({
+                type: 'SPAWN_ALIEN',
+                id: Math.random().toString(36).substr(2, 9),
+                enemyType: 1,
+                x: 1250,
+                y: 1250
+            });
+            console.log("Starter alien spawned for the Master Commander!");
+        }
+    }, 1000);
+
     startScreen.style.display = 'none';
     initInput();
     gameLoop();
