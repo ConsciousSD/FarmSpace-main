@@ -1,5 +1,5 @@
 import { gameState, CANVAS_WIDTH, CANVAS_HEIGHT } from './state.js';
-import { gameAudio, shootSound, pigPickupSound, chickenPickupSound} from './audio.js';
+import { gameAudio, shootSound, pigPickupSound, chickenPickupSound, watermelonPickupSound, seedPickupSound } from './audio.js';
 import { checkCollision } from './helpers.js';
 import { player } from './player.js';
 
@@ -10,14 +10,76 @@ export function initInput() {
         if (k === 'r' && gameState.isGameOver) location.reload();
         if (k === 'arrowup') gameState.moveUp = true; if (k === 'arrowdown') gameState.moveDown = true;
         if (k === 'arrowleft') gameState.moveLeft = true; if (k === 'arrowright') gameState.moveRight = true;
-        if (k === 's' && gameState.hasGun && gameState.ammo > 0) { gameState.isShooting = true; shootSound.play(); }
         if (k === 'p') gameState.isPaused = !gameState.isPaused;
-        if (k === ' ') { 
-            if (gameState.seedInventory > 0) { 
-                gameState.plantedWatermelons.push({ x: gameState.playerX, y: gameState.playerY, fIdx: 0, fT: 0, done: false, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70 }); 
-                gameState.seedInventory--; 
-            } 
+
+        // Hotbar Slot Selection (Keys 1-5)
+        if (['1', '2', '3', '4', '5'].includes(k)) {
+            let slotIndex = parseInt(k) - 1;
+            gameState.activeSlot = slotIndex;
+            
+            // Sync legacy engine flags based on active slot contents
+            gameState.hasGun = (gameState.inventory[slotIndex] === 'gun');
+            gameState.hasScythe = (gameState.inventory[slotIndex] === 'scythe');
         }
+
+        // Shoot check bound dynamically to active item type 'gun'
+        if (k === 's') {
+            if (gameState.inventory[gameState.activeSlot] === 'gun' && gameState.ammo > 0) {
+                gameState.isShooting = true; 
+                shootSound.play(); 
+            }
+        }
+
+        // FIXED: Key 'A' now specifically handles plowing the ground
+        if (k === 'a') {
+            if (gameState.hasScythe) {
+                // 1. Calculate tile coordinates centered near player feet
+                let patchX = Math.floor((gameState.playerX + 94) / 100) * 100;
+                let patchY = Math.floor((gameState.playerY + 144) / 100) * 100;
+
+                // 2. Only plow if this exact spot isn't already a dirt patch
+                let alreadyPlowed = gameState.plowedPatches.some(p => p.x === patchX && p.y === patchY);
+
+                if (!alreadyPlowed) {
+                    gameState.plowedPatches.push({ x: patchX, y: patchY, size: 150 });
+                    seedPickupSound.currentTime = 0;
+                    seedPickupSound.play(); 
+                }
+            }
+        }
+
+        // FIXED: Spacebar now ONLY plants watermelons if standing inside a plowed patch
+        if (k === ' ') {
+            if (gameState.seedInventory > 0) {
+                let playerFeetX = gameState.playerX + 144; // Mid-axis of player footprint
+                let playerFeetY = gameState.playerY + 200; // Y coordinate near player feet
+
+                // Check if the player's coordinate rests inside ANY plowed patch square element bounds
+                let targetedPatch = gameState.plowedPatches.find(patch => {
+                    return playerFeetX >= patch.x && 
+                           playerFeetX <= patch.x + patch.size && 
+                           playerFeetY >= patch.y && 
+                           playerFeetY <= patch.y + patch.size;
+                });
+
+                if (targetedPatch) {
+                    // Snaps and centers the 288px watermelon asset inside the 150px dirt patch perfectly
+                    gameState.plantedWatermelons.push({
+                        x: targetedPatch.x + (targetedPatch.size / 2) - 144,
+                        y: targetedPatch.y + (targetedPatch.size / 2) - 144,
+                        fIdx: 0,
+                        fT: 0,
+                        done: false,
+                        width: 288,
+                        height: 288,
+                        hitboxOffsetX: 70,
+                        hitboxOffsetY: 70
+                    });
+                    gameState.seedInventory--;
+                }
+            }
+        }
+
         if (k === 'd') {
             if (gameState.carryingPig) { gameState.carryingPig = null; }
             else if (gameState.carryingChicken) { gameState.carryingChicken = null; }
@@ -25,7 +87,7 @@ export function initInput() {
                 let grabbed = false;
                 gameState.grenadesOnGround.forEach((g, i) => {
                     if (checkCollision(player, { x: g.x, y: g.y, width: 200, height: 200 })) {
-                        gameState.carryingGrenade = true; gameState.grenadesOnGround.splice(i, 1); pigPickupSound.play(); grabbed = true;
+                        gameState.carryingGrenade = true; gameState.grenadesOnGround.splice(i, 1); watermelonPickupSound.play(); grabbed = true;
                     }
                 });
                 if (!grabbed) {

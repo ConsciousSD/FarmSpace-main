@@ -2,8 +2,8 @@ import { gameState, ctx, CANVAS_WIDTH, CANVAS_HEIGHT } from './state.js';
 import { initInput } from './input.js';
 import { player } from './player.js';
 import { checkCollision, createEnemy, triggerGameOver } from './helpers.js';
-import { gameAudio, moveSound, shootSound, seedPickupSound, tirePickupSound, watermelonPickupSound, pigWalkSound } from './audio.js';
-import { corralSprite, grenadeSprite, seedSprite, tireSprite, ak47Idle, enemyDeathSprite, enemyDeathSprite2, pigIdle, pigWalk, chickenSprite, watermelonSprite } from './assets.js';
+import { gameAudio, moveSound, shootSound, seedPickupSound, grenadeExplosionSound, tirePickupSound, watermelonPickupSound, pigWalkSound } from './audio.js';
+import { corralSprite, grenadeSprite, scytheSprite, seedSprite, tireSprite, ak47Idle, enemyDeathSprite, enemyDeathSprite2, pigIdle, pigWalk, chickenSprite, watermelonSprite, charmSprite } from './assets.js';
 
 // Setup intervals scaling
 setInterval(() => {
@@ -28,8 +28,20 @@ function gameLoop() {
         return;
     }
 
+    // --- BASE BACKGROUND LAYER ---
     ctx.drawImage(corralSprite, gameState.corral.x, gameState.corral.y, gameState.corral.width, gameState.corral.height);
 
+    gameState.plowedPatches.forEach(patch => {
+        ctx.fillStyle = '#5c4033'; // Rich brown "dirt" color
+        ctx.fillRect(patch.x, patch.y, patch.size, patch.size);
+
+        // Optional: Add a dark border to give the square definition
+        ctx.strokeStyle = '#4a3329';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(patch.x, patch.y, patch.size, patch.size);
+    });
+
+    // --- GAME ITEMS & REWARDS LAYER ---
     gameState.grenadesOnGround.forEach(g => {
         let pulse = Math.sin(gameState.gameFrame * 0.1) * 5;
         ctx.drawImage(grenadeSprite, g.x - pulse, g.y - pulse, 160 + pulse * 2, 160 + pulse * 2);
@@ -45,12 +57,26 @@ function gameLoop() {
     gameState.isMoving = (gameState.moveLeft || gameState.moveRight || gameState.moveUp || gameState.moveDown);
     if (gameState.isMoving) moveSound.play(); else moveSound.pause();
 
+    // --- PLAYER DRAW LAYER ---
     player.update();
     player.draw(ctx);
 
+    // FIXED: Refactored Weapon pickups to fill open slots dynamically
     gameState.guns.forEach((g, i) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 600, 600);
-        if (checkCollision(player, { x: g.x, y: g.y, width: 600, height: 600, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { gameState.hasGun = true; gameState.ammo = 100; gameState.guns.splice(i, 1); seedPickupSound.play(); }
+        if (checkCollision(player, { x: g.x, y: g.y, width: 600, height: 600, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { 
+            gameState.guns.splice(i, 1); 
+            seedPickupSound.play(); 
+            gameState.ammo = 100;
+
+            if (!gameState.inventory.includes('gun')) {
+                let emptySlot = gameState.inventory.indexOf(null);
+                if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun';
+            }
+            // Live status sync
+            gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun');
+            gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
+        }
     });
     gameState.seeds.forEach((s, i) => {
         ctx.drawImage(seedSprite, 0, (Math.floor(gameState.gameFrame / 10) % 2) * 288, 288, 288, s.x, s.y, 288, 288);
@@ -61,12 +87,30 @@ function gameLoop() {
         if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { gameState.isPowered = true; gameState.powerTimer = Date.now(); gameState.tires.splice(i, 1); tirePickupSound.play(); }
     });
 
+    // FIXED: Refactored Scythe pickups to fill open slots dynamically
+    gameState.scythes.forEach((s, i) => {
+        ctx.drawImage(scytheSprite, s.x, s.y, 300, 300);
+        if (checkCollision(player, { x: s.x, y: s.y, width: 300, height: 300, hitboxOffsetX: 30, hitboxOffsetY: 30 }, true)) {
+            gameState.scythes.splice(i, 1);
+            seedPickupSound.play();
+
+            if (!gameState.inventory.includes('scythe')) {
+                let emptySlot = gameState.inventory.indexOf(null);
+                if (emptySlot !== -1) gameState.inventory[emptySlot] = 'scythe';
+            }
+            // Live status sync
+            gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun');
+            gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
+        }
+    });
+
     if (gameState.hasGun && gameState.isShooting) {
         gameState.ammo -= 0.15;
         if (gameState.ammo <= 0) { gameState.hasGun = false; gameState.isShooting = false; gameState.gunCoolDownActive = true; gameState.killsSinceEmpty = 0; shootSound.pause(); }
     }
     if (gameState.gunCoolDownActive && gameState.killsSinceEmpty >= 10) { gameState.gunCoolDownActive = false; gameState.killsSinceEmpty = 0; }
 
+    // --- ENEMIES LAYER ---
     for (let i = gameState.enemies.length - 1; i >= 0; i--) {
         let en = gameState.enemies[i];
         if (en.isDying) {
@@ -100,6 +144,7 @@ function gameLoop() {
         }
     }
 
+    // --- ANIMALS & CHARMS LAYER ---
     let anyAnimalWalking = false;
     gameState.pigs.forEach((pig) => {
         if (pig === gameState.carryingPig) { pig.x = gameState.playerX + 50; pig.y = gameState.playerY + 50; }
@@ -135,20 +180,28 @@ function gameLoop() {
 
     if (gameState.carryingPig && checkCollision(player, gameState.corral)) {
         gameState.pigs.splice(gameState.pigs.indexOf(gameState.carryingPig), 1); gameState.carryingPig = null; gameState.pigsSaved++; watermelonPickupSound.play();
+        gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
     }
     if (gameState.carryingChicken && checkCollision(player, gameState.corral)) {
         gameState.chickens.splice(gameState.chickens.indexOf(gameState.carryingChicken), 1); gameState.carryingChicken = null; gameState.chickensSaved++; watermelonPickupSound.play();
+        gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
     }
+
+    gameState.charms.forEach((charm, i) => {
+        let bobbing = Math.sin(gameState.gameFrame * 0.08) * 12;
+        ctx.drawImage(charmSprite, charm.x, charm.y + bobbing, charm.width, charm.height);
+        if (checkCollision(player, { x: charm.x, y: charm.y, width: charm.width, height: charm.height }, true)) {
+            gameState.charms.splice(i, 1);
+            seedPickupSound.play();
+            gameState.enemyKillScore += 5; 
+        }
+    });
 
     for (let i = gameState.plantedWatermelons.length - 1; i >= 0; i--) {
         let wm = gameState.plantedWatermelons[i];
         if (!wm.done) {
             wm.fT++;
-            if (wm.fT > 50) {
-                wm.fIdx++;
-                wm.fT = 0;
-                if (wm.fIdx >= 8) wm.done = true;
-            }
+            if (wm.fT > 50) { wm.fIdx++; wm.fT = 0; if (wm.fIdx >= 8) wm.done = true; }
         }
         let wmCols = 3, wmSize = 288;
         ctx.drawImage(watermelonSprite, (wm.fIdx % wmCols) * wmSize, Math.floor(wm.fIdx / wmCols) * wmSize, wmSize, wmSize, wm.x, wm.y, 288, 288);
@@ -166,7 +219,7 @@ function gameLoop() {
             ctx.drawImage(grenadeSprite, -80, -80, 160, 160);
             ctx.restore();
             if (g.timer <= 0) {
-                g.exploded = true; watermelonPickupSound.play();
+                g.exploded = true; grenadeExplosionSound.play();
                 gameState.enemies.forEach(en => { if (Math.hypot(en.x - g.x, en.y - g.y) < 450) { en.health = 0; en.isDying = true; en.deathFrame = 0; gameState.enemyKillScore++; } });
             }
         } else {
@@ -177,6 +230,7 @@ function gameLoop() {
 
     if (gameState.carryingGrenade) ctx.drawImage(grenadeSprite, gameState.playerX + (player.facingRight ? 200 : -20), gameState.playerY + 80, 160, 160);
 
+    // --- HUD & METRICS OVERLAY ---
     ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(10, 10, 850, 240);
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
     ctx.fillText(`Seeds: ${gameState.seedInventory} | Kills: ${gameState.enemyKillScore} | Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved}`, 30, 60);
@@ -190,20 +244,54 @@ function gameLoop() {
         ctx.fillStyle = 'yellow'; let rem = Math.max(0, Math.ceil((10000 - (now - gameState.powerTimer)) / 1000));
         ctx.fillText(`TRACTOR: ${rem}s`, 350, 60);
     }
+
+    // FIXED: Render the visual 5-slot Hotbar HUD table directly onto top middle area
+    let boxSize = 80;
+    let boxPadding = 15;
+    let totalWidth = (boxSize * 5) + (boxPadding * 4);
+    let startX = (CANVAS_WIDTH / 2) - (totalWidth / 2);
+    let startY = 30; 
+
+    for (let j = 0; j < 5; j++) {
+        let boxX = startX + (j * (boxSize + boxPadding));
+
+        if (j === gameState.activeSlot) {
+            ctx.fillStyle = 'rgba(230, 180, 40, 0.85)'; 
+            ctx.fillRect(boxX - 4, startY - 4, boxSize + 8, boxSize + 8);
+            ctx.fillStyle = 'rgba(60, 50, 40, 0.9)'; 
+        } else {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; 
+            ctx.fillRect(boxX - 2, startY - 2, boxSize + 4, boxSize + 4);
+            ctx.fillStyle = 'rgba(20, 20, 20, 0.8)'; 
+        }
+        ctx.fillRect(boxX, startY, boxSize, boxSize);
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.font = '22px Arial';
+        ctx.fillText(j + 1, boxX + 8, startY + 24);
+
+        let item = gameState.inventory[j];
+        if (item === 'scythe') {
+            ctx.drawImage(scytheSprite, boxX + 10, startY + 10, boxSize - 20, boxSize - 20);
+        } else if (item === 'gun') {
+            ctx.drawImage(ak47Idle, boxX + 5, startY + 5, boxSize - 10, boxSize - 10);
+        }
+    }
+
     requestAnimationFrame(gameLoop);
 }
 
 function spawnTick() {
     if (gameState.isPaused || gameState.isGameOver) return;
-    const c1 = gameState.enemies.filter(e => e.type === 1).length, 
-          c2 = gameState.enemies.filter(e => e.type === 2).length, 
+    const c1 = gameState.enemies.filter(e => e.type === 1).length,
+          c2 = gameState.enemies.filter(e => e.type === 2).length,
           c3 = gameState.enemies.filter(e => e.type === 3).length;
-    
+
     let possible = [];
     if (c1 < (40 + Math.floor(gameState.enemyKillScore / 10))) possible.push(1);
     if ((gameState.enemyKillScore >= 20 || gameState.pigsSaved >= 10) && c2 < 8) possible.push(2);
     if (gameState.enemyKillScore >= 40 && c3 < 4) possible.push(3);
-    
+
     if (possible.length > 0) {
         gameState.enemies.push(createEnemy(possible[Math.floor(Math.random() * possible.length)]));
     }
@@ -216,11 +304,19 @@ const startScreen = document.getElementById('start-screen');
 function startGame() {
     if (startScreen.style.display === 'none') return;
     startScreen.style.display = 'none';
-    gameAudio.play().catch(e => console.log("Audio blocked")); 
-    
+    gameAudio.play().catch(e => console.log("Audio blocked"));
+
     initInput();
     spawnTick();
-    
+
+    // FIXED: Initialize Box 1 (index 0) with Scythe right at launch
+    gameState.inventory[0] = 'scythe';
+    gameState.hasScythe = true;
+
+    // Spawn an initial scythe close to the player's starting area for immediate testing
+    gameState.scythes.push({ x: 1500, y: 1300 });
+
+    // EXISTING INTERVALS
     setInterval(() => { if (!gameState.isGameOver && gameState.seeds.length < 5) gameState.seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 12000);
     setInterval(() => {
         if (!gameState.isGameOver && gameState.pigs.length < 5 && !gameState.isPaused) gameState.pigs.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 });
@@ -235,7 +331,14 @@ function startGame() {
             gameState.grenadesOnGround.push({ x: Math.random() * 2000 + 200, y: Math.random() * 2000 + 200 });
         }
     }, 5000);
-    
+
+    // New interval to drop a replacement scythe every 30 seconds if the player doesn't have one and none are on the ground
+    setInterval(() => {
+        if (!gameState.isGameOver && !gameState.hasScythe && gameState.scythes.length < 1) {
+            gameState.scythes.push({ x: Math.random() * 2000 + 100, y: Math.random() * 2000 + 100 });
+        }
+    }, 30000);
+
     gameLoop();
 }
 

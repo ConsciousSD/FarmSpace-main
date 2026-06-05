@@ -13,11 +13,23 @@ export const gameState = {
     hasGun: false, gunCoolDownActive: false, killsSinceEmpty: 0,
     isPowered: false, powerTimer: 0, isPaused: false, isGameOver: false,
     
+    // --- WEAPONS, PLOWING & HOTBAR SYSTEM ---
+    hasScythe: false, 
+    plowedPatches: [], 
+    scythes: [],
+    inventory: [null, null, null, null, null], // Slots 0-4 mapping to Hotkeys 1-5
+    activeSlot: 0,                             // The currently selected index
+
+    // --- ANIMALS & COLLECTIBLES ---
     pigs: [], carryingPig: null, pigsSaved: 0, lastPigSoundTime: 0,
     chickens: [], carryingChicken: null, chickensSaved: 0,
+    charms: [],
+    
+    // --- MAP OBJECTS & THROWABLES ---
     enemies: [], seeds: [], plantedWatermelons: [], tires: [], guns: [],
     grenadesOnGround: [], activeGrenades: [], carryingGrenade: false,
     
+    // --- PERSISTENT STATE DATA ---
     highScore: localStorage.getItem('farmSpaceHighScore') || 0,
     pigHighScore: localStorage.getItem('farmSpacePigHighScore') || 0,
     chickenHighScore: localStorage.getItem('farmSpaceChickenHighScore') || 0,

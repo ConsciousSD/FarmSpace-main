@@ -23,3 +23,6 @@ pigPickupSound.volume = 0.4;
 
 export const chickenPickupSound = new Audio('assets/Chickenpickedup.mp3');
 chickenPickupSound.volume = 0.4;
+
+export const grenadeExplosionSound = new Audio('assets/grenade-explosion.mp3');
+grenadeExplosionSound.volume = 0.6;
