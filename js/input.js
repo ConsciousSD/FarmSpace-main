@@ -9,40 +9,25 @@ export function initInput() {
         let k = e.key.toLowerCase();
 
         // =======================================================
-        // 🛸 ALIEN MASTER CONTROLS (SAFETY HARDENED)
+        // 🛸 ALIEN MASTER: MIND CONTROL LOCK-ON OVERRIDE
         // =======================================================
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
+            
+            // Key S instantly locks onto the nearest free alien running on the field!
             if (k === 's') {
-                if (gameState.alienMasterSeeds > 0) {
-                    // Safety check: Is the network channel fully active?
-                    if (gameState.peerConnection && gameState.peerConnection.open) {
-                        gameState.alienMasterSeeds--;
-                        gameState.peerConnection.send({
-                            type: 'SPAWN_ALIEN',
-                            id: "alien-" + Math.random().toString(36).substr(2, 9), 
-                            enemyType: Math.floor(Math.random() * 3) + 1,
-                            x: 1250,
-                            y: 1250
-                        });
-                        console.log("Alien Master successfully spawned an alien wave!");
+                if (gameState.enemies.length > 0) {
+                    // Look for an alien that isn't dead and isn't your currently selected one
+                    let freeAlien = gameState.enemies.find(en => en.id !== gameState.controlledEnemyId && !en.isDying);
+                    
+                    if (freeAlien) {
+                        gameState.controlledEnemyId = freeAlien.id;
+                        console.log(`Target acquired! Controlling alien: ${freeAlien.id}`);
                     } else {
-                        // If PeerJS is still connecting, wait 500ms and try sending the packet again automatically!
-                        console.log("Network pipeline establishing connection... Retrying spawn shortly.");
-                        setTimeout(() => {
-                            if (gameState.peerConnection && gameState.peerConnection.open) {
-                                gameState.alienMasterSeeds--;
-                                gameState.peerConnection.send({
-                                    type: 'SPAWN_ALIEN',
-                                    id: "alien-" + Math.random().toString(36).substr(2, 9), 
-                                    enemyType: Math.floor(Math.random() * 3) + 1,
-                                    x: 1250,
-                                    y: 1250
-                                });
-                            }
-                        }, 500);
+                        // If only one alien exists, re-lock onto it to be safe
+                        gameState.controlledEnemyId = gameState.enemies[0].id;
                     }
                 } else {
-                    console.log("Cannot spawn! Your commodities pool is empty. Wait for aliens to steal seeds.");
+                    console.log("No aliens on the field yet! Waiting for automatic wave spawns...");
                 }
             }
 
@@ -50,7 +35,7 @@ export function initInput() {
             if (gameState.controlledEnemyId && gameState.peerConnection && gameState.peerConnection.open) {
                 let activeAlien = gameState.enemies.find(en => en.id === gameState.controlledEnemyId);
                 if (activeAlien) {
-                    let alienSpeed = 35; 
+                    let alienSpeed = 35; // Manual driving speed
                     if (e.key === 'ArrowUp') activeAlien.y -= alienSpeed;
                     if (e.key === 'ArrowDown') activeAlien.y += alienSpeed;
                     if (e.key === 'ArrowLeft') activeAlien.x -= alienSpeed;
@@ -64,7 +49,7 @@ export function initInput() {
                     });
                 }
             }
-            return; // 🛑 Prevents bleeding into farmer gun mechanics
+            return; // 🛑 CRITICAL: Exits here so your machine never runs farmer gun mechanics!
         }
 
         // =======================================================
@@ -168,7 +153,7 @@ export function initInput() {
     };
 
     // =======================================================
-    // LEFT-CLICK SELECTION MATH
+    // MOUSE DOWN LEFT-CLICK RE-SELECTION (BACKUP SYSTEM)
     // =======================================================
     window.addEventListener('mousedown', e => {
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
@@ -184,7 +169,7 @@ export function initInput() {
 
                 if (clickedAlien) {
                     gameState.controlledEnemyId = clickedAlien.id;
-                    console.log(`Successfully mind-controlled target alien: ${clickedAlien.id}`);
+                    console.log(`Successfully mind-controlled target alien via click: ${clickedAlien.id}`);
                 }
             }
         }
