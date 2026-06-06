@@ -22,13 +22,13 @@ setInterval(() => {
 // Helper function to spin up a floating particle number over a target
 function createDamageNumber(x, y, amount, isCritical = false) {
     gameState.damageNumbers.push({
-        x: x + Math.random() * 60 - 30, // slight random horizontal offset
+        x: x + Math.random() * 60 - 30, 
         y: y - 10,
         text: amount,
         color: isCritical ? '#ffcc00' : '#00ffff',
         size: isCritical ? 38 : 28,
         alpha: 1.0,
-        vY: -2.5 - Math.random() * 1.5 // upward floating velocity vector
+        vY: -2.5 - Math.random() * 1.5 
     });
 }
 
@@ -48,7 +48,7 @@ function dispatchMasterVesselSpawn() {
         fT: 0,
         width: 288,
         height: 288,
-        health: 500 // NUMERICAL SYSTEM: 500 total HP for Boss scaling
+        health: 50 // ADJUSTED: Enemy player health set to a 50 HP pool limit
     });
 
     if (gameState.peerConnection && gameState.peerConnection.open) {
@@ -94,7 +94,7 @@ export function resetGameSession() {
     gameState.scytheDurability = gameState.maxScytheDurability;
 
     gameState.enemies = [];
-    gameState.damageNumbers = []; // Clear popups
+    gameState.damageNumbers = []; 
     gameState.plowedPatches = [];
     gameState.plantedWatermelons = [];
     gameState.seeds = [];
@@ -381,23 +381,24 @@ function gameLoop() {
                 );
             }
 
-            // --- REFACTORED: NUMERICAL IN-LINE WEAPON DAMAGE CONTROLLER ---
+            // --- WEAPON DAMAGE CONTROLLER: 1 DAMAGE PER 2 BULLETS (0.5 DAMAGE) ---
             if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
                 let pDx = en.x - gameState.playerX;
                 if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0))) {
                     
                     if (!en.lastHitTime) en.lastHitTime = 0;
 
-                    // Lowered I-Frames to 350ms because damage ticks are small (12 per hit)
-                    if (Date.now() - en.lastHitTime > 350) {
-                        let baseMax = (isPlayerControlledDrone) ? 500 : 100;
+                    // Reduced I-Frame cooldown slightly so the AK can track ticks closely
+                    if (Date.now() - en.lastHitTime > 380) {
+                        let baseMax = (isPlayerControlledDrone) ? 50 : 10;
                         if (en.health === undefined) en.health = baseMax;
 
-                        let bulletDamage = 12; // Numerical value
+                        // TUNED: 0.5 damage per shot means exactly 1 damage per 2 connected hits
+                        let bulletDamage = 0.5; 
                         en.health -= bulletDamage;
                         en.lastHitTime = Date.now(); 
 
-                        // Trigger Floating Text Pop-up on local canvas
+                        // Accumulate floats cleanly by displaying absolute damage ticks gracefully
                         createDamageNumber(en.x + 144, en.y, bulletDamage, false);
 
                         if (en.health <= 0) {
@@ -412,7 +413,7 @@ function gameLoop() {
 
             // --- UNIVERSAL ALIEN PLAYER HEALTH BAR OVERLAY ---
             if (gameState.isMultiplayer && en.id === gameState.controlledEnemyId) {
-                let maxAlienHP = 500; // Reflecting upgraded numerical base pool limits
+                let maxAlienHP = 50; // Updated track frame bounds to 50
                 let currentHP = en.health !== undefined ? en.health : maxAlienHP;
 
                 let barWidth = 140;
@@ -510,7 +511,7 @@ function gameLoop() {
             watermelonPickupSound.play().catch(() => {});
             let target = gameState.enemies.find(e => !e.isDying);
             if (target) { 
-                let cropDamage = 150; // High explosive damage
+                let cropDamage = 25; // Adjusted explosive scaling ratio
                 target.health = (target.health !== undefined) ? target.health - cropDamage : 0;
                 createDamageNumber(target.x + 144, target.y, cropDamage, true);
 
@@ -534,7 +535,7 @@ function gameLoop() {
                 grenadeExplosionSound.play().catch(() => {});
                 gameState.enemies.forEach(en => { 
                     if (Math.hypot(en.x - g.x, en.y - g.y) < 450) { 
-                        let grenadeDamage = 135; // Custom burst scaling
+                        let grenadeDamage = 20; 
                         en.health = (en.health !== undefined) ? en.health - grenadeDamage : 0;
                         createDamageNumber(en.x + 144, en.y, grenadeDamage, true);
 
@@ -554,7 +555,7 @@ function gameLoop() {
     for (let k = gameState.damageNumbers.length - 1; k >= 0; k--) {
         let dmgNum = gameState.damageNumbers[k];
         dmgNum.y += dmgNum.vY;
-        dmgNum.alpha -= 0.025; // fade effect
+        dmgNum.alpha -= 0.025; 
 
         if (dmgNum.alpha <= 0) {
             gameState.damageNumbers.splice(k, 1);
@@ -673,7 +674,7 @@ function spawnTick() {
 
     if (possible.length > 0) {
         let spawnedEnemy = createEnemy(possible[Math.floor(Math.random() * possible.length)]);
-        spawnedEnemy.health = 100; // Standard numerical pool
+        spawnedEnemy.health = 10; // Normalized minion pool matching scaling constraints
         gameState.enemies.push(spawnedEnemy);
     }
 
