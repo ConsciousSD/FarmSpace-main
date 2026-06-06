@@ -6,14 +6,19 @@ import { gameAudio, moveSound, shootSound, seedPickupSound, grenadeExplosionSoun
 import { enemySprite, enemySprite2, enemySprite3, corralSprite, grenadeSprite, scytheSprite, seedSprite, tireSprite, ak47Idle, enemyDeathSprite, enemyDeathSprite2, pigIdle, pigWalk, chickenSprite, watermelonSprite, charmSprite } from './assets.js';
 import { initMultiplayer } from './network.js';
 
+// Global reference system to prevent interval stacking leaks
+let gameIntervals = [];
+
 // Setup intervals scaling
 setInterval(() => {
     if (!gameState.isPaused && !gameState.isGameOver && !gameState.isMultiplayer) gameState.spawnRateMultiplier *= 0.90;
 }, 60000);
 
-// Reset game variables safely in memory without killing the room session connection
-// Reset game variables safely in memory without killing the room session connection
 export function resetGameSession() {
+    // Clear all recurring background loops cleanly
+    gameIntervals.forEach(clearInterval);
+    gameIntervals = [];
+
     // 1. Force state flags back to active play mode instantly
     gameState.isGameOver = false;
     gameState.isPaused = false;
@@ -76,9 +81,11 @@ export function resetGameSession() {
 
     // 2. CRITICAL FIX: Restart the single-player AI wave ticker on the host machine
     if (gameState.playerRole === 'farmer') {
-        // Clear old timeouts to avoid doubled spawn speeds, then spin up a fresh ticker
         clearTimeout(window.spawnTickTimeout);
         spawnTick();
+        
+        // Spin up fresh asset generators safely since old intervals were dropped
+        startTrackingIntervals();
     }
 
     console.log("LOBBY RETAINED: Soft session restart processed cleanly.");
@@ -203,10 +210,10 @@ function gameLoop() {
         }
     }
 
-    // Weapon ground collisions
+    // Weapon ground collisions - FIXED size scale parameters from 600 down to 160
     gameState.guns.forEach((g, i) => {
-        ctx.drawImage(ak47Idle, g.x, g.y, 600, 600);
-        if (checkCollision(player, { x: g.x, y: g.y, width: 600, height: 600, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) {
+        ctx.drawImage(ak47Idle, g.x, g.y, 160, 160);
+        if (checkCollision(player, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
             gameState.guns.splice(i, 1); seedPickupSound.play(); gameState.ammo = 100;
             if (!gameState.inventory.includes('gun')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; }
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
@@ -321,11 +328,10 @@ function gameLoop() {
     }
 
     // --- ANIMALS & CHARMS LAYER ---
-    let anyAnimalWalking = false;
     gameState.pigs.forEach((pig) => {
         if (pig === gameState.carryingPig) { pig.x = gameState.playerX + 50; pig.y = gameState.playerY + 50; }
         else {
-            anyAnimalWalking = true; pig.x += pig.vx; pig.y += pig.vy;
+            pig.x += pig.vx; pig.y += pig.vy;
             if (pig.x < 0 || pig.x > CANVAS_WIDTH - 240) pig.vx *= -1;
             if (pig.y < 0 || pig.y > CANVAS_HEIGHT - 240) pig.vy *= -1;
             pig.fT++; if (pig.fT > 15) { pig.fIdx = (pig.fIdx + 1) % 3; pig.fT = 0; }
@@ -340,7 +346,7 @@ function gameLoop() {
     gameState.chickens.forEach((chicken) => {
         if (chicken === gameState.carryingChicken) { chicken.x = gameState.playerX + 50; chicken.y = gameState.playerY + 50; }
         else {
-            anyAnimalWalking = true; chicken.x += chicken.vx; chicken.y += chicken.vy;
+            chicken.x += chicken.vx; chicken.y += chicken.vy;
             if (chicken.x < 0 || chicken.x > CANVAS_WIDTH - 240) chicken.vx *= -1;
             if (chicken.y < 0 || chicken.y > CANVAS_HEIGHT - 240) chicken.vy *= -1;
             chicken.fT++; if (chicken.fT > 15) { chicken.fIdx = (chicken.fIdx + 1) % 1; chicken.fT = 0; }
@@ -383,7 +389,11 @@ function gameLoop() {
     gameState.activeGrenades.forEach((g, i) => {
         if (!g.exploded) {
             g.x += g.vX; g.y += g.vY; g.vY += 0.6; g.timer--;
-            ctx.save(); ctx.translate(g.vX, g.y); ctx.rotate(gameState.gameFrame * 0.3); ctx.drawImage(grenadeSprite, -80, -80, 160, 160); ctx.restore();
+            ctx.save(); 
+            ctx.translate(g.x, g.y); // FIXED translation assignment parameter error from vX to x
+            ctx.rotate(gameState.gameFrame * 0.3); 
+            ctx.drawImage(grenadeSprite, -80, -80, 160, 160); 
+            ctx.restore();
             if (g.timer <= 0 && gameState.playerRole === 'farmer') {
                 g.exploded = true; grenadeExplosionSound.play();
                 gameState.enemies.forEach(en => { if (Math.hypot(en.x - g.x, en.y - g.y) < 450) { en.health = 0; en.isDying = true; en.deathFrame = 0; gameState.enemyKillScore++; } });
@@ -458,7 +468,6 @@ function gameLoop() {
 }
 
 function spawnTick() {
-    // FIXED: Allow spawning to continue if it's a multiplayer versus match!
     if (gameState.isPaused || gameState.isGameOver) return;
 
     const c1 = gameState.enemies.filter(e => e.type === 1).length,
@@ -472,8 +481,18 @@ function spawnTick() {
 
     if (possible.length > 0) gameState.enemies.push(createEnemy(possible[Math.floor(Math.random() * possible.length)]));
 
-    // Attaches securely to the window scope for clean soft-resets
     window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
+}
+
+// Separated into explicit function to avoid structural clone duplication errors across sessions
+function startTrackingIntervals() {
+    gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.seeds.length < 5) gameState.seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 12000));
+    gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.pigs.length < 5 && !gameState.isPaused) gameState.pigs.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 }); }, 5000));
+    gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.chickens.length < 5 && !gameState.isPaused) gameState.chickens.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 }); }, 5000));
+    gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.tires.length < 1) gameState.tires.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 75000));
+    gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.enemyKillScore >= 5 && !gameState.hasGun && !gameState.gunCoolDownActive && gameState.guns.length === 0) gameState.guns.push({ x: Math.random() * 2000, y: Math.random() * 2000 }); }, 4000));
+    gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.enemies.length > 12 && gameState.grenadesOnGround.length < 1) gameState.grenadesOnGround.push({ x: Math.random() * 2000 + 200, y: Math.random() * 2000 + 200 }); }, 5000));
+    gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && !gameState.hasScythe && gameState.scythes.length < 1) gameState.scythes.push({ x: Math.random() * 2000 + 100, y: Math.random() * 2000 + 100 }); }, 30000));
 }
 
 const startButton = document.getElementById('start-button');
@@ -490,14 +509,7 @@ function startGame() {
     gameState.inventory[0] = 'scythe'; gameState.hasScythe = true;
     gameState.scythes.push({ x: 1500, y: 1300 });
 
-    setInterval(() => { if (!gameState.isGameOver && gameState.seeds.length < 5) gameState.seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 12000);
-    setInterval(() => { if (!gameState.isGameOver && gameState.pigs.length < 5 && !gameState.isPaused) gameState.pigs.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 }); }, 5000);
-    setInterval(() => { if (!gameState.isGameOver && gameState.chickens.length < 5 && !gameState.isPaused) gameState.chickens.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 }); }, 5000);
-    setInterval(() => { if (!gameState.isGameOver && gameState.tires.length < 1) gameState.tires.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 75000);
-    setInterval(() => { if (!gameState.isGameOver && gameState.enemyKillScore >= 5 && !gameState.hasGun && !gameState.gunCoolDownActive && gameState.guns.length === 0) gameState.guns.push({ x: Math.random() * 2000, y: Math.random() * 2000 }); }, 4000);
-    setInterval(() => { if (!gameState.isGameOver && gameState.enemies.length > 12 && gameState.grenadesOnGround.length < 1) gameState.grenadesOnGround.push({ x: Math.random() * 2000 + 200, y: Math.random() * 2000 + 200 }); }, 5000);
-    setInterval(() => { if (!gameState.isGameOver && !gameState.hasScythe && gameState.scythes.length < 1) gameState.scythes.push({ x: Math.random() * 2000 + 100, y: Math.random() * 2000 + 100 }); }, 30000);
-
+    startTrackingIntervals();
     gameLoop();
 }
 
@@ -545,17 +557,14 @@ joinMasterBtn.addEventListener('click', () => {
     }, 1500);
 });
 
-// FIXED: Key listener broadcasts the network signal BEFORE wiping state, preventing synchronization lock timeouts
 window.addEventListener('keydown', e => {
     if (e.key === 'Enter') startGame();
 
     if ((e.key === 'r' || e.key === 'R') && gameState.isGameOver) {
         console.log("Broadcasting authoritative restart event across connection lane...");
         if (gameState.isMultiplayer && gameState.peerConnection && gameState.peerConnection.open) {
-            // Signal the other client first while they're still guaranteed inside the gameover state
             gameState.peerConnection.send({ type: 'REMOTE_SOFT_RESET' });
         }
-        // Execute local reset safely
         resetGameSession();
     }
 });
