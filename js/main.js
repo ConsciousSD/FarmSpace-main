@@ -458,15 +458,21 @@ function gameLoop() {
 }
 
 function spawnTick() {
-    if (gameState.isPaused || gameState.isGameOver || gameState.isMultiplayer) return;
-    const c1 = gameState.enemies.filter(e => e.type === 1).length, c2 = gameState.enemies.filter(e => e.type === 2).length, c3 = gameState.enemies.filter(e => e.type === 3).length;
+    // FIXED: Allow spawning to continue if it's a multiplayer versus match!
+    if (gameState.isPaused || gameState.isGameOver) return;
+
+    const c1 = gameState.enemies.filter(e => e.type === 1).length,
+        c2 = gameState.enemies.filter(e => e.type === 2).length,
+        c3 = gameState.enemies.filter(e => e.type === 3).length;
+
     let possible = [];
     if (c1 < (40 + Math.floor(gameState.enemyKillScore / 10))) possible.push(1);
     if ((gameState.enemyKillScore >= 20 || gameState.pigsSaved >= 10) && c2 < 8) possible.push(2);
     if (gameState.enemyKillScore >= 40 && c3 < 4) possible.push(3);
+
     if (possible.length > 0) gameState.enemies.push(createEnemy(possible[Math.floor(Math.random() * possible.length)]));
 
-    // FIXED: Attaches the ticker handler directly to the window architecture scope
+    // Attaches securely to the window scope for clean soft-resets
     window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
 }
 
