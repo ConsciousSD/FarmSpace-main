@@ -173,7 +173,7 @@ function gameLoop() {
                 }
             });
 
-            // SILKY SMOOTH LOCAL TICK: Frames run natively on both computers independently
+            // SILKY SMOOTH LOCAL TICK
             en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
             
             let enemyImage;
@@ -181,11 +181,26 @@ function gameLoop() {
             else if (en.type === 3) enemyImage = chickenSprite; 
             else enemyImage = enemyDeathSprite; 
 
-            if (en.type === 2) ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
-            else if (en.type === 3) ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
-            else ctx.drawImage(enemyImage, en.fIdx * 288, 0, 288, 288, en.x, en.y, 288, 288);
+            // Type 2: Boss Fat Alien
+            if (en.type === 2) {
+                ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
+            } 
+            // Type 3: Chicken Alien
+            else if (en.type === 3) {
+                ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
+            } 
+            // HARD FIXED Type 1: Basic Scout Alien (Player 2 Master Drone)
+            else {
+                ctx.drawImage(
+                    enemyImage, 
+                    en.fIdx * 288, 0, // Source X (slices along sheet), Source Y
+                    288, 288,         // Source Width, Source Height (Single square grid size)
+                    en.x, en.y,       // Canvas coordinates placement vectors
+                    288, 288          // Render box scaling parameters
+                );
+            }
 
-            // FIXED: Deleted the flashing cyan stroke target circle from drawing here!
+            // Cyan selection ring is completely cleared out here!
 
             if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
                 let pDx = en.x - gameState.playerX;
