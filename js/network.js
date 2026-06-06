@@ -30,18 +30,15 @@ function setupConnection(conn) {
 
         // --- 👩‍🌾 SURVIVOR / HOST SIDE (YOUR WIFE) ---
         if (gameState.playerRole === 'farmer') {
-            // Master requested a real native alien entity built directly on the server host layout
             if (data.type === 'SPAWN_MASTER_VESSEL') {
                 console.log(`Spawning real basic scout for Player 2 with ID: ${data.id}`);
                 
-                // CRITICAL: Uses her native factory function to construct a real asset wrapper
                 const masterAlien = createEnemy(1); 
                 if (masterAlien) {
                     masterAlien.id = data.id;
-                    masterAlien.x = 1250; // Perfect map center positioning
+                    masterAlien.x = 1250; 
                     masterAlien.y = 1250;
-                    masterAlien.isLocallyControlled = true; // Halts her built-in AI pathfinding scripts
-                    
+                    masterAlien.isLocallyControlled = true; 
                     gameState.enemies.push(masterAlien);
                 }
             }
@@ -49,8 +46,9 @@ function setupConnection(conn) {
             if (data.type === 'CONTROL_MOVE') {
                 let targetedAlien = gameState.enemies.find(e => e.id === data.id);
                 if (targetedAlien) {
-                    targetedAlien.x = data.x;
-                    targetedAlien.y = data.y;
+                    // Use Math.round to guarantee no floating decimal numbers trip binarypack
+                    targetedAlien.x = Math.round(data.x);
+                    targetedAlien.y = Math.round(data.y);
                     targetedAlien.isLocallyControlled = true; 
                 }
             }
@@ -59,30 +57,43 @@ function setupConnection(conn) {
         // --- 🛸 ALIEN MASTER CLIENT SIDE (YOU) ---
         if (gameState.playerRole === 'alien-master') {
             if (data.type === 'SYNC_ENEMIES') {
-                // Keep your active avatar entity array safe from being cleared by network latency packets
+                // Safeguard against over-writing your local master target array slot
                 let activeDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
                 
-                // Safely mirror all host-constructed entities down to your layout canvas screen
-                gameState.enemies = data.enemies;
+                // Unpack only sanitized network integers cleanly back into structural map arrays
+                gameState.enemies = data.enemies.map(ne => {
+                    return {
+                        id: ne.id,
+                        type: parseInt(ne.type) || 1,
+                        x: parseInt(ne.x),
+                        y: parseInt(ne.y),
+                        fIdx: parseInt(ne.fIdx) || 0,
+                        fT: 0,
+                        isDying: ne.isDying ? true : false,
+                        health: 5,
+                        width: 288,
+                        height: 288
+                    };
+                });
                 
                 if (activeDrone && !gameState.enemies.some(e => e.id === gameState.controlledEnemyId)) {
                     gameState.enemies.push(activeDrone);
                 }
             }
             if (data.type === 'SYNC_FARMER') {
-                gameState.playerX = data.playerX;
-                gameState.playerY = data.playerY;
-                gameState.plowedPatches = data.plowedPatches;
-                gameState.plantedWatermelons = data.plantedWatermelons;
-                gameState.seeds = data.seeds;
-                gameState.pigs = data.pigs;
-                gameState.chickens = data.chickens;
-                gameState.charms = data.charms;
-                gameState.grenadesOnGround = data.grenadesOnGround;
-                gameState.activeGrenades = data.activeGrenades;
+                gameState.playerX = parseInt(data.playerX);
+                gameState.playerY = parseInt(data.playerY);
+                gameState.plowedPatches = data.plowedPatches || [];
+                gameState.plantedWatermelons = data.plantedWatermelons || [];
+                gameState.seeds = data.seeds || [];
+                gameState.pigs = data.pigs || [];
+                gameState.chickens = data.chickens || [];
+                gameState.charms = data.charms || [];
+                gameState.grenadesOnGround = data.grenadesOnGround || [];
+                gameState.activeGrenades = data.activeGrenades || [];
                 gameState.carryingGrenade = data.carryingGrenade;
-                gameState.guns = data.guns;
-                gameState.activeSlot = data.activeSlot;
+                gameState.guns = data.guns || [];
+                gameState.activeSlot = parseInt(data.activeSlot) || 0;
                 gameState.inventory = data.inventory;
                 gameState.hasScythe = data.hasScythe;
                 gameState.hasGun = data.hasGun;

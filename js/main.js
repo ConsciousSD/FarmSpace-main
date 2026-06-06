@@ -172,13 +172,11 @@ function gameLoop() {
 
             en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
             
-            // FIXED: If en.img drops over network serialization packets, point it directly to our cached graphics!
-            let enemyImage = en.img; 
-            if (!enemyImage) {
-                if (en.type === 2) enemyImage = enemyDeathSprite2; 
-                else if (en.type === 3) enemyImage = chickenSprite; 
-                else enemyImage = enemyDeathSprite; // Fixed fallback sheet pointer layout
-            }
+            // FIXED FALLBACK CODES: Completely detached from complex variable objects
+            let enemyImage;
+            if (en.type === 2) enemyImage = enemyDeathSprite2; 
+            else if (en.type === 3) enemyImage = chickenSprite; 
+            else enemyImage = enemyDeathSprite; 
 
             if (en.type === 2) ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
             else if (en.type === 3) ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
@@ -285,7 +283,7 @@ function gameLoop() {
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
     
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
-        ctx.fillStyle = '#00ffff'; ctx.fillText(`ALIEN TARGET SELECTION SYSTEM`, 30, 60);
+        ctx.fillStyle = '#00ffff'; ctx.fillText(`神经网络链接: VERSUS PILOT ACTIVE`, 30, 60);
     } else {
         ctx.fillText(`Seeds: ${gameState.seedInventory} | Kills: ${gameState.enemyKillScore} | Saved: ${gameState.pigsSaved}`, 30, 60);
     }
@@ -307,26 +305,34 @@ function gameLoop() {
     }
 
     if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.gameFrame % 3 === 0) {
+        // FIXED PAYLOAD COMPRESSION: Stripped complex sub-properties (like en.img) so binarypack doesn't trip!
         gameState.peerConnection.send({
             type: 'SYNC_ENEMIES',
-            enemies: gameState.enemies.map(en => ({ id: en.id, x: en.x, y: en.y, type: en.type, fIdx: en.fIdx, isDying: en.isDying }))
+            enemies: gameState.enemies.map(en => ({ 
+                id: en.id, 
+                x: Math.round(en.x), 
+                y: Math.round(en.y), 
+                type: parseInt(en.type) || 1, 
+                fIdx: parseInt(en.fIdx) || 0, 
+                isDying: en.isDying ? true : false 
+            }))
         });
 
         gameState.peerConnection.send({
             type: 'SYNC_FARMER',
-            playerX: gameState.playerX,
-            playerY: gameState.playerY,
-            plowedPatches: gameState.plowedPatches,
-            plantedWatermelons: gameState.plantedWatermelons,
-            seeds: gameState.seeds,
-            pigs: gameState.pigs,
-            chickens: gameState.chickens,
-            charms: gameState.charms,
-            grenadesOnGround: gameState.grenadesOnGround,
-            activeGrenades: gameState.activeGrenades,
-            carryingGrenade: gameState.carryingGrenade,
-            guns: gameState.guns,
-            activeSlot: gameState.activeSlot,
+            playerX: Math.round(gameState.playerX),
+            playerY: Math.round(gameState.playerY),
+            plowedPatches: gameState.plowedPatches.map(p => ({ x: p.x, y: p.y, size: p.size })),
+            plantedWatermelons: gameState.plantedWatermelons.map(w => ({ x: w.x, y: w.y, fIdx: w.fIdx, done: w.done })),
+            seeds: gameState.seeds.map(s => ({ x: s.x, y: s.y })),
+            pigs: gameState.pigs.map(p => ({ x: Math.round(p.x), y: Math.round(p.y), vx: p.vx, vy: p.vy, fIdx: p.fIdx })),
+            chickens: gameState.chickens.map(c => ({ x: Math.round(c.x), y: Math.round(c.y), vx: c.vx, vy: c.vy, fIdx: c.fIdx })),
+            charms: gameState.charms.map(ch => ({ x: ch.x, y: ch.y, width: ch.width, height: ch.height })),
+            grenadesOnGround: gameState.grenadesOnGround.map(g => ({ x: g.x, y: g.y })),
+            activeGrenades: gameState.activeGrenades.map(ag => ({ x: ag.x, y: ag.y, exploded: ag.exploded })),
+            carryingGrenade: gameState.carryingGrenade ? true : false,
+            guns: gameState.guns.map(gu => ({ x: gu.x, y: gu.y })),
+            activeSlot: parseInt(gameState.activeSlot) || 0,
             inventory: gameState.inventory,
             hasScythe: gameState.hasScythe,
             hasGun: gameState.hasGun
@@ -391,8 +397,6 @@ joinMasterBtn.addEventListener('click', () => {
     initInput();
     gameLoop();
 
-    // FIXED: Instead of faking a local drone, we blast a network packet to her machine
-    // telling her engine to drop an AUTHORITATIVE alien on her map grid center instantly!
     let uniqueDroneId = "master-drone-" + Math.floor(Math.random() * 99999);
     gameState.controlledEnemyId = uniqueDroneId;
 
