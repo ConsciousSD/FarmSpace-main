@@ -1,5 +1,5 @@
 import { gameState } from './state.js';
-import { createEnemy } from './helpers.js';
+import { createEnemy, triggerGameOver } from './helpers.js';
 import { shootSound, moveSound } from './audio.js';
 
 export function initMultiplayer(role, roomCode) {
@@ -32,16 +32,16 @@ function setupConnection(conn) {
         // --- 👩‍🌾 SURVIVOR / HOST SIDE (YOUR WIFE) ---
         if (gameState.playerRole === 'farmer') {
             if (data.type === 'SPAWN_MASTER_VESSEL') {
-                console.log(`Spawning host-authoritative puppet drone for Player 2: ${data.id}`);
+                console.log(`Spawning host puppet instance for Master Drone: ${data.id}`);
                 let masterAlien = gameState.enemies.find(e => e.id === data.id);
                 if (!masterAlien) {
-                    masterAlien = createEnemy(1);
+                    masterAlien = createEnemy(1); 
                     if (masterAlien) {
                         masterAlien.id = data.id;
-                        masterAlien.x = 1250;
+                        masterAlien.x = 1250; 
                         masterAlien.y = 1250;
-                        masterAlien.speed = 0; // Stops any default AI tracking speeds
-                        masterAlien.isLocallyControlled = true;
+                        masterAlien.speed = 0; 
+                        masterAlien.isLocallyControlled = true; 
                         gameState.enemies.push(masterAlien);
                     }
                 }
@@ -49,10 +49,7 @@ function setupConnection(conn) {
 
             if (data.type === 'CONTROL_MOVE') {
                 let targetedAlien = gameState.enemies.find(e => e.id === data.id);
-
-                // FIXED FALLBACK: If she doesn't recognize your ID, build the entity right now!
                 if (!targetedAlien) {
-                    console.log(`Ghost player protection triggered. Spawning missing drone ID: ${data.id}`);
                     targetedAlien = createEnemy(1);
                     if (targetedAlien) {
                         targetedAlien.id = data.id;
@@ -61,20 +58,29 @@ function setupConnection(conn) {
                         gameState.enemies.push(targetedAlien);
                     }
                 }
-
                 if (targetedAlien) {
                     targetedAlien.x = Math.round(data.x);
                     targetedAlien.y = Math.round(data.y);
-                    targetedAlien.isLocallyControlled = true;
+                    targetedAlien.isLocallyControlled = true; 
                 }
             }
+
+            // Client requested a master level restart
+            if (data.type === 'REQUEST_RESTART') {
+                window.location.reload(); 
+            }
         }
+        
         // --- 🛸 ALIEN MASTER CLIENT SIDE (YOU) ---
         if (gameState.playerRole === 'alien-master') {
-            if (data.type === 'SYNC_ENEMIES') {
-                // FIXED: Protect your player-controlled alien structure
-                let activeDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
+            if (data.type === 'GAME_OVER_TRIGGER') {
+                console.log("Host reports a fatal collision! Freezing client field.");
+                // Pulls up the Game Over UI screen overlay on your laptop instantly
+                gameState.isGameOver = true; 
+                if (typeof triggerGameOver === 'function') triggerGameOver();
+            }
 
+            if (data.type === 'SYNC_ENEMIES') {
                 data.enemies.forEach(ne => {
                     let localEn = gameState.enemies.find(e => e.id === ne.id);
                     if (!localEn) {
@@ -92,15 +98,11 @@ function setupConnection(conn) {
                         };
                         gameState.enemies.push(localEn);
                     } else {
-                        // FIXED: Smooth updates! Only map location markers across the link.
-                        // We do NOT overwrite fIdx or fT here so your local animation cycle walks smoothly!
                         localEn.x = ne.x;
                         localEn.y = ne.y;
                         localEn.isDying = ne.isDying;
                     }
                 });
-
-                // Filter out destroyed targets dynamically
                 gameState.enemies = gameState.enemies.filter(le => data.enemies.some(ne => ne.id === le.id) || le.id === gameState.controlledEnemyId);
             }
             if (data.type === 'SYNC_FARMER') {
@@ -119,17 +121,17 @@ function setupConnection(conn) {
                 gameState.activeSlot = parseInt(data.activeSlot) || 0;
                 gameState.inventory = data.inventory;
                 gameState.hasScythe = data.hasScythe;
-
+                
                 if (data.isShooting) {
                     gameState.isShooting = true;
-                    if (shootSound.paused) shootSound.play().catch(() => { });
+                    if (shootSound.paused) shootSound.play().catch(() => {});
                 } else {
                     gameState.isShooting = false;
                     shootSound.pause();
                 }
 
                 if (data.isMoving) {
-                    if (moveSound.paused) moveSound.play().catch(() => { });
+                    if (moveSound.paused) moveSound.play().catch(() => {});
                 } else {
                     moveSound.pause();
                 }

@@ -86,13 +86,16 @@ function gameLoop() {
     if (gameState.isPaused) { requestAnimationFrame(gameLoop); return; }
     gameState.gameFrame++;
 
+    // --- SHARED GAME OVER UI ---
     if (gameState.isGameOver) {
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         ctx.textAlign = 'center'; ctx.fillStyle = 'white'; ctx.font = 'bold 160px Arial';
         ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 150);
         ctx.font = '70px Arial'; ctx.fillText(`Kills: ${gameState.enemyKillScore} (Best: ${gameState.highScore})`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
         ctx.fillStyle = '#66ff66'; ctx.fillText(`Pigs Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 100);
-        ctx.fillStyle = 'white'; ctx.font = '50px Arial'; ctx.fillText('Press [ R ] to Restart', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
+        
+        ctx.fillStyle = 'white'; ctx.font = '50px Arial'; 
+        ctx.fillText('Press [ R ] to Restart Session', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
         return;
     }
 
@@ -108,18 +111,16 @@ function gameLoop() {
         if (localIsMoving) moveSound.play().catch(()=>{}); else moveSound.pause();
     }
 
-    // --- ALIEN MASTER POSITION OUTBOUND BROADCAST ---
+    // --- ALIEN MASTER CONTROLLER TRACKING INTERCEPT ---
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && gameState.peerConnection && gameState.peerConnection.open) {
         let myDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
         if (myDrone) {
-            // Read your laptop's manual arrow tracking controls
             if (gameState.moveLeft) myDrone.x -= 7;  if (gameState.moveRight) myDrone.x += 7;
             if (gameState.moveUp) myDrone.y -= 7;    if (gameState.moveDown) myDrone.y += 7;
             
             myDrone.x = Math.max(0, Math.min(CANVAS_WIDTH - 288, myDrone.x));
             myDrone.y = Math.max(0, Math.min(CANVAS_HEIGHT - 288, myDrone.y));
 
-            // FIXED: Blasts your updated location back to the host screen instantly!
             gameState.peerConnection.send({
                 type: 'CONTROL_MOVE',
                 id: gameState.controlledEnemyId,
@@ -196,10 +197,8 @@ function gameLoop() {
                 }
             });
 
-            // Local animation clock loop steps safely
             en.fT++; 
             if (en.fT >= 10) { 
-                // Type 1 basic scout limits safely at modulo 3 to avoid blank 4th cell quadrant space
                 en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : (en.type === 1 ? 3 : 2)); 
                 en.fT = 0; 
             }
@@ -209,18 +208,12 @@ function gameLoop() {
             else if (en.type === 3) enemyImage = enemySprite3; 
             else enemyImage = enemySprite; 
 
-            // Type 2: Boss Fat Alien
             if (en.type === 2) {
                 ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
-            } 
-            // Type 3: Chicken Alien
-            else if (en.type === 3) {
+            } else if (en.type === 3) {
                 ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
-            } 
-            // Type 1: Basic Scout Alien (Slices poltra.png 576x576 into 2x2 grid frames)
-            else {
+            } else {
                 let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : (Math.floor(gameState.gameFrame / 10) % 3);
-
                 let spriteCol = trueFrame % 2;          
                 let spriteRow = Math.floor(trueFrame / 2); 
 
@@ -239,9 +232,18 @@ function gameLoop() {
                     en.health--; if (en.health <= 0) { en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; }
                 }
             }
+
+            // COLLISION RESOLUTION: Executed solely on Host Machine
             if (checkCollision(player, en) && gameState.playerRole === 'farmer') {
-                if (gameState.isPowered) { en.health = 0; en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++; }
-                else triggerGameOver();
+                if (gameState.isPowered) { 
+                    en.health = 0; en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++; 
+                } else {
+                    // FIXED: Alert your laptop over P2P before shutting off the host clock loop!
+                    if (gameState.isMultiplayer && gameState.peerConnection) {
+                        gameState.peerConnection.send({ type: 'GAME_OVER_TRIGGER' });
+                    }
+                    triggerGameOver(); 
+                }
             }
         }
     }
@@ -463,5 +465,26 @@ joinMasterBtn.addEventListener('click', () => {
     }, 1500); 
 });
 
-window.addEventListener('keydown', e => { if (e.key === 'Enter') startGame(); });
+// FIXED: Master listener captures keyboard session restarts across the link cleanly
+window.addEventListener('keydown', e => { 
+    if (e.key === 'Enter') startGame(); 
+    
+    if ((e.key === 'r' || e.key === 'R') && gameState.isGameOver) {
+        console.log("Restart triggered!");
+        if (gameState.isMultiplayer && gameState.peerConnection) {
+            if (gameState.playerRole === 'alien-master') {
+                // If you press R, ask her machine to refresh
+                gameState.peerConnection.send({ type: 'REQUEST_RESTART' });
+                setTimeout(() => { window.location.reload(); }, 3000);
+            } else {
+                // If she presses R, tell your machine to refresh
+                gameState.peerConnection.send({ type: 'REQUEST_RESTART' });
+                window.location.reload();
+            }
+        } else {
+            window.location.reload();
+        }
+    }
+});
+
 initInput();
