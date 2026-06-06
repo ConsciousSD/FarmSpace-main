@@ -28,48 +28,50 @@ function setupConnection(conn) {
     conn.on('data', (data) => {
         if (!data || !data.type) return;
 
-        // --- 👩‍🌾 SURVIVOR / HOST SIDE (YOUR WIFE) ---
+        // --- 👩‍🌾 FARMER HOST SIDE (WIFE) ---
         if (gameState.playerRole === 'farmer') {
-            // Master requested an official puppet drone built in the host room
-            if (data.type === 'FORCE_HOST_SPAWN') {
-                console.log("Master requested a live puppet drone asset.");
-                const newEnemy = createEnemy(1); // Spawns a real Basic Scout with full graphics
-                if (newEnemy) {
-                    newEnemy.id = data.id;
-                    newEnemy.x = 1250;
-                    newEnemy.y = 1250;
-                    newEnemy.speed = 4; // Give it some speed to chase her!
-                    newEnemy.isLocallyControlled = true; // Tells her AI engine not to override your movement
-                    gameState.enemies.push(newEnemy);
-
-                    // Send a message back to you confirming you own this alien id
-                    conn.send({ type: 'CONFIRM_POSSESSION', id: data.id });
-                }
-            }
-
-            // Listens to your arrow key move inputs and updates her screen coordinates
             if (data.type === 'CONTROL_MOVE') {
                 let targetedAlien = gameState.enemies.find(e => e.id === data.id);
-                if (targetedAlien) {
-                    targetedAlien.x = data.x;
-                    targetedAlien.y = data.y;
-                    targetedAlien.isLocallyControlled = true;
+                
+                if (!targetedAlien) {
+                    targetedAlien = createEnemy(1);
+                    targetedAlien.id = data.id;
+                    gameState.enemies.push(targetedAlien);
                 }
+                
+                targetedAlien.x = data.x;
+                targetedAlien.y = data.y;
+                targetedAlien.isLocallyControlled = true; 
             }
         }
         
-        // --- 🛸 ALIEN MASTER SIDE (YOU) ---
+        // --- 🛸 ALIEN MASTER CLIENT SIDE (YOU) ---
         if (gameState.playerRole === 'alien-master') {
-            if (data.type === 'CONFIRM_POSSESSION') {
-                gameState.controlledEnemyId = data.id;
-                console.log(`Neural link secure! Possessing host alien: ${data.id}`);
-            }
             if (data.type === 'SYNC_ENEMIES') {
-                // Instantly syncs her real alien positions and sprites to your screen
-                gameState.enemies = data.enemies;
+                // Reconstruct the synced aliens into native objects so your graphics processor can draw them
+                let activeDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
+                
+                gameState.enemies = data.enemies.map(networkEnemy => {
+                    return {
+                        id: networkEnemy.id,
+                        type: networkEnemy.type,
+                        x: networkEnemy.x,
+                        y: networkEnemy.y,
+                        fIdx: networkEnemy.fIdx,
+                        fT: 0,
+                        isDying: networkEnemy.isDying,
+                        deathFrame: networkEnemy.deathFrame,
+                        deathTimer: networkEnemy.deathTimer,
+                        width: 288,
+                        height: 288
+                    };
+                });
+                
+                if (activeDrone && !gameState.enemies.some(e => e.id === gameState.controlledEnemyId)) {
+                    gameState.enemies.push(activeDrone);
+                }
             }
             if (data.type === 'SYNC_FARMER') {
-                // Streams her coordinates and items straight to your monitor viewport
                 gameState.playerX = data.playerX;
                 gameState.playerY = data.playerY;
                 gameState.plowedPatches = data.plowedPatches;
