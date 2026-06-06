@@ -12,7 +12,9 @@ setInterval(() => {
 }, 60000);
 
 // Reset game variables safely in memory without killing the room session connection
+// Reset game variables safely in memory without killing the room session connection
 export function resetGameSession() {
+    // 1. Force state flags back to active play mode instantly
     gameState.isGameOver = false;
     gameState.isPaused = false;
     gameState.enemyKillScore = 0;
@@ -23,7 +25,7 @@ export function resetGameSession() {
     gameState.hasGun = false;
     gameState.gunCoolDownActive = false;
     gameState.killsSinceEmpty = 0;
-    
+
     // Core placement re-initialization
     gameState.playerX = 500;
     gameState.playerY = 500;
@@ -71,7 +73,15 @@ export function resetGameSession() {
             });
         }
     }
-    console.log(" LOBBY RETAINED: Soft session restart processed cleanly.");
+
+    // 2. CRITICAL FIX: Restart the single-player AI wave ticker on the host machine
+    if (gameState.playerRole === 'farmer') {
+        // Clear old timeouts to avoid doubled spawn speeds, then spin up a fresh ticker
+        clearTimeout(window.spawnTickTimeout);
+        spawnTick();
+    }
+
+    console.log("LOBBY RETAINED: Soft session restart processed cleanly.");
 }
 
 function gameLoop() {
@@ -84,10 +94,10 @@ function gameLoop() {
     let patchLifetime = 15000;
     gameState.plowedPatches = gameState.plowedPatches.filter(patch => {
         let hasCrop = gameState.plantedWatermelons.some(wm => {
-            return Math.abs((wm.x + 144) - (patch.x + 75)) < 80 && 
-                   Math.abs((wm.y + 144) - (patch.y + 75)) < 80;
+            return Math.abs((wm.x + 144) - (patch.x + 75)) < 80 &&
+                Math.abs((wm.y + 144) - (patch.y + 75)) < 80;
         });
-        if (hasCrop) return true; 
+        if (hasCrop) return true;
         return (Date.now() - patch.createdAt) < patchLifetime;
     });
 
@@ -127,16 +137,16 @@ function gameLoop() {
     // --- HOTBAR HUD SYSTEM ---
     let boxSize = 80; let boxPadding = 15;
     let totalWidth = (boxSize * 5) + (boxPadding * 4);
-    let startX = (CANVAS_WIDTH / 2) - (totalWidth / 2); let startY = 30; 
+    let startX = (CANVAS_WIDTH / 2) - (totalWidth / 2); let startY = 30;
 
     for (let j = 0; j < 5; j++) {
         let boxX = startX + (j * (boxSize + boxPadding));
         if (j === gameState.activeSlot) {
             ctx.fillStyle = 'rgba(230, 180, 40, 0.85)'; ctx.fillRect(boxX - 4, startY - 4, boxSize + 8, boxSize + 8);
-            ctx.fillStyle = 'rgba(60, 50, 40, 0.9)'; 
+            ctx.fillStyle = 'rgba(60, 50, 40, 0.9)';
         } else {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.fillRect(boxX - 2, startY - 2, boxSize + 4, boxSize + 4);
-            ctx.fillStyle = 'rgba(20, 20, 20, 0.8)'; 
+            ctx.fillStyle = 'rgba(20, 20, 20, 0.8)';
         }
         ctx.fillRect(boxX, startY, boxSize, boxSize);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'; ctx.font = '22px Arial'; ctx.fillText(j + 1, boxX + 8, startY + 24);
@@ -156,8 +166,8 @@ function gameLoop() {
         ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 150);
         ctx.font = '70px Arial'; ctx.fillText(`Kills: ${gameState.enemyKillScore} (Best: ${gameState.highScore})`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
         ctx.fillStyle = '#66ff66'; ctx.fillText(`Pigs Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 100);
-        
-        ctx.fillStyle = 'white'; ctx.font = '50px Arial'; 
+
+        ctx.fillStyle = 'white'; ctx.font = '50px Arial';
         ctx.fillText('Press [ R ] to Restart Session', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
         return;
     }
@@ -168,19 +178,19 @@ function gameLoop() {
     if (gameState.moveUp) gameState.playerY -= speed; if (gameState.moveDown) gameState.playerY += speed;
     gameState.playerX = Math.max(0, Math.min(CANVAS_WIDTH - 288, gameState.playerX));
     gameState.playerY = Math.max(0, Math.min(CANVAS_HEIGHT - 288, gameState.playerY));
-    
+
     let localIsMoving = (gameState.moveLeft || gameState.moveRight || gameState.moveUp || gameState.moveDown);
     if (gameState.playerRole === 'farmer') {
-        if (localIsMoving) moveSound.play().catch(()=>{}); else moveSound.pause();
+        if (localIsMoving) moveSound.play().catch(() => { }); else moveSound.pause();
     }
 
     // --- ALIEN MASTER CONTROLLER TRACKING INTERCEPT ---
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && gameState.peerConnection && gameState.peerConnection.open) {
         let myDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
         if (myDrone) {
-            if (gameState.moveLeft) myDrone.x -= 7;  if (gameState.moveRight) myDrone.x += 7;
-            if (gameState.moveUp) myDrone.y -= 7;    if (gameState.moveDown) myDrone.y += 7;
-            
+            if (gameState.moveLeft) myDrone.x -= 7; if (gameState.moveRight) myDrone.x += 7;
+            if (gameState.moveUp) myDrone.y -= 7; if (gameState.moveDown) myDrone.y += 7;
+
             myDrone.x = Math.max(0, Math.min(CANVAS_WIDTH - 288, myDrone.x));
             myDrone.y = Math.max(0, Math.min(CANVAS_HEIGHT - 288, myDrone.y));
 
@@ -196,7 +206,7 @@ function gameLoop() {
     // Weapon ground collisions
     gameState.guns.forEach((g, i) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 600, 600);
-        if (checkCollision(player, { x: g.x, y: g.y, width: 600, height: 600, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { 
+        if (checkCollision(player, { x: g.x, y: g.y, width: 600, height: 600, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) {
             gameState.guns.splice(i, 1); seedPickupSound.play(); gameState.ammo = 100;
             if (!gameState.inventory.includes('gun')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; }
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
@@ -243,11 +253,11 @@ function gameLoop() {
         } else {
             let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
             let moveDir = (gameState.isPowered || (gameState.hasGun && gameState.isShooting)) ? -1 : 1;
-            
+
             let isPlayerControlledDrone = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
-            
+
             if (!isPlayerControlledDrone && !en.isLocallyControlled && gameState.playerRole === 'farmer') {
-                en.x += (dx / dist) * en.speed * moveDir; 
+                en.x += (dx / dist) * en.speed * moveDir;
                 en.y += (dy / dist) * en.speed * moveDir;
             }
 
@@ -260,16 +270,16 @@ function gameLoop() {
                 }
             });
 
-            en.fT++; 
-            if (en.fT >= 10) { 
-                en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : (en.type === 1 ? 3 : 2)); 
-                en.fT = 0; 
+            en.fT++;
+            if (en.fT >= 10) {
+                en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : (en.type === 1 ? 3 : 2));
+                en.fT = 0;
             }
-            
+
             let enemyImage;
-            if (en.type === 2) enemyImage = enemySprite2; 
-            else if (en.type === 3) enemyImage = enemySprite3; 
-            else enemyImage = enemySprite; 
+            if (en.type === 2) enemyImage = enemySprite2;
+            else if (en.type === 3) enemyImage = enemySprite3;
+            else enemyImage = enemySprite;
 
             if (en.type === 2) {
                 ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
@@ -277,15 +287,15 @@ function gameLoop() {
                 ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
             } else {
                 let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : (Math.floor(gameState.gameFrame / 10) % 3);
-                let spriteCol = trueFrame % 2;          
-                let spriteRow = Math.floor(trueFrame / 2); 
+                let spriteCol = trueFrame % 2;
+                let spriteRow = Math.floor(trueFrame / 2);
 
                 ctx.drawImage(
-                    enemyImage, 
-                    spriteCol * 288, spriteRow * 288, 
-                    288, 288,                         
-                    en.x, en.y,                       
-                    288, 288                          
+                    enemyImage,
+                    spriteCol * 288, spriteRow * 288,
+                    288, 288,
+                    en.x, en.y,
+                    288, 288
                 );
             }
 
@@ -298,13 +308,13 @@ function gameLoop() {
 
             // COLLISION RESOLUTION: Executed solely on Host Machine
             if (checkCollision(player, en) && gameState.playerRole === 'farmer') {
-                if (gameState.isPowered) { 
-                    en.health = 0; en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++; 
+                if (gameState.isPowered) {
+                    en.health = 0; en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++;
                 } else {
                     if (gameState.isMultiplayer && gameState.peerConnection) {
                         gameState.peerConnection.send({ type: 'GAME_OVER_TRIGGER' });
                     }
-                    triggerGameOver(); 
+                    triggerGameOver();
                 }
             }
         }
@@ -354,7 +364,7 @@ function gameLoop() {
         let bobbing = Math.sin(gameState.gameFrame * 0.08) * 12;
         ctx.drawImage(charmSprite, charm.x, charm.y + bobbing, charm.width, charm.height);
         if (checkCollision(player, { x: charm.x, y: charm.y, width: charm.width, height: charm.height }, true)) {
-            gameState.charms.splice(i, 1); seedPickupSound.play(); gameState.enemyKillScore += 5; 
+            gameState.charms.splice(i, 1); seedPickupSound.play(); gameState.enemyKillScore += 5;
         }
     });
 
@@ -389,7 +399,7 @@ function gameLoop() {
     // --- HUD AND METRIC PRINTS ---
     ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(10, 10, 850, 240);
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
-    
+
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
         ctx.fillStyle = '#00ffff'; ctx.fillText(`神经网络链接: VERSUS PILOT ACTIVE`, 30, 60);
     } else {
@@ -412,12 +422,12 @@ function gameLoop() {
     if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.gameFrame % 3 === 0) {
         gameState.peerConnection.send({
             type: 'SYNC_ENEMIES',
-            enemies: gameState.enemies.map(en => ({ 
-                id: en.id, 
-                x: Math.round(en.x), 
-                y: Math.round(en.y), 
-                type: parseInt(en.type) || 1, 
-                isDying: en.isDying ? true : false 
+            enemies: gameState.enemies.map(en => ({
+                id: en.id,
+                x: Math.round(en.x),
+                y: Math.round(en.y),
+                type: parseInt(en.type) || 1,
+                isDying: en.isDying ? true : false
             }))
         });
 
@@ -455,7 +465,9 @@ function spawnTick() {
     if ((gameState.enemyKillScore >= 20 || gameState.pigsSaved >= 10) && c2 < 8) possible.push(2);
     if (gameState.enemyKillScore >= 40 && c3 < 4) possible.push(3);
     if (possible.length > 0) gameState.enemies.push(createEnemy(possible[Math.floor(Math.random() * possible.length)]));
-    setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
+
+    // FIXED: Attaches the ticker handler directly to the window architecture scope
+    window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
 }
 
 const startButton = document.getElementById('start-button');
@@ -495,7 +507,7 @@ hostFarmerBtn.addEventListener('click', () => {
 joinMasterBtn.addEventListener('click', () => {
     const roomCode = roomCodeInput.value.trim().toLowerCase();
     if (!roomCode) return alert("Please enter a room code first!");
-    
+
     initMultiplayer('alien-master', roomCode);
 
     startScreen.style.display = 'none';
@@ -524,13 +536,13 @@ joinMasterBtn.addEventListener('click', () => {
             });
             console.log("Blasted authoritative alien request to Host!");
         }
-    }, 1500); 
+    }, 1500);
 });
 
 // FIXED: Key listener broadcasts the network signal BEFORE wiping state, preventing synchronization lock timeouts
-window.addEventListener('keydown', e => { 
-    if (e.key === 'Enter') startGame(); 
-    
+window.addEventListener('keydown', e => {
+    if (e.key === 'Enter') startGame();
+
     if ((e.key === 'r' || e.key === 'R') && gameState.isGameOver) {
         console.log("Broadcasting authoritative restart event across connection lane...");
         if (gameState.isMultiplayer && gameState.peerConnection && gameState.peerConnection.open) {
