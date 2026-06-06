@@ -3,7 +3,7 @@ import { initInput } from './input.js';
 import { player } from './player.js';
 import { checkCollision, createEnemy, triggerGameOver } from './helpers.js';
 import { gameAudio, moveSound, shootSound, seedPickupSound, grenadeExplosionSound, tirePickupSound, watermelonPickupSound, pigWalkSound } from './audio.js';
-import { corralSprite, grenadeSprite, scytheSprite, seedSprite, tireSprite, ak47Idle, enemyDeathSprite, enemyDeathSprite2, pigIdle, pigWalk, chickenSprite, watermelonSprite, charmSprite } from './assets.js';
+import { enemySprite, enemySprite2, enemySprite3, corralSprite, grenadeSprite, scytheSprite, seedSprite, tireSprite, ak47Idle, enemyDeathSprite, enemyDeathSprite2, pigIdle, pigWalk, chickenSprite, watermelonSprite, charmSprite } from './assets.js';
 import { initMultiplayer } from './network.js';
 
 // Setup intervals scaling
@@ -159,7 +159,10 @@ function gameLoop() {
             let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
             let moveDir = (gameState.isPowered || (gameState.hasGun && gameState.isShooting)) ? -1 : 1;
             
-            if (!en.isLocallyControlled && gameState.playerRole === 'farmer') {
+            // Player versus match AI possession check
+            let isPlayerControlledDrone = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
+            
+            if (!isPlayerControlledDrone && !en.isLocallyControlled && gameState.playerRole === 'farmer') {
                 en.x += (dx / dist) * en.speed * moveDir; 
                 en.y += (dy / dist) * en.speed * moveDir;
             }
@@ -173,13 +176,18 @@ function gameLoop() {
                 }
             });
 
-            // SILKY SMOOTH LOCAL TICK
-            en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
+            // Local animation frames clock steps cleanly
+            en.fT++; 
+            if (en.fT >= 10) { 
+                en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : (en.type === 1 ? 3 : 2)); 
+                en.fT = 0; 
+            }
             
+            // FIXED: Pointed base units (Type 1) directly to enemySprite walking sheet (Poltra.png)
             let enemyImage;
-            if (en.type === 2) enemyImage = enemyDeathSprite2; 
-            else if (en.type === 3) enemyImage = chickenSprite; 
-            else enemyImage = enemyDeathSprite; 
+            if (en.type === 2) enemyImage = enemySprite2; 
+            else if (en.type === 3) enemyImage = enemySprite3; 
+            else enemyImage = enemySprite; // <--- ROUTING LOGIC HARD-FIXED TO POINT TO YOUR WALKING SHEET!
 
             // Type 2: Boss Fat Alien
             if (en.type === 2) {
@@ -189,18 +197,21 @@ function gameLoop() {
             else if (en.type === 3) {
                 ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
             } 
-            // HARD FIXED Type 1: Basic Scout Alien (Player 2 Master Drone)
+            // Type 1: Basic Scout Alien (Slices poltra.png 576x576 in a perfect 2x2 grid segment!)
             else {
+                let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : (Math.floor(gameState.gameFrame / 10) % 4);
+
+                let spriteCol = trueFrame % 2;          
+                let spriteRow = Math.floor(trueFrame / 2); 
+
                 ctx.drawImage(
                     enemyImage, 
-                    en.fIdx * 288, 0, // Source X (slices along sheet), Source Y
-                    288, 288,         // Source Width, Source Height (Single square grid size)
-                    en.x, en.y,       // Canvas coordinates placement vectors
-                    288, 288          // Render box scaling parameters
+                    spriteCol * 288, spriteRow * 288, // Source X crop location, Source Y crop location
+                    288, 288,                         // Source Width, Source Height (Single square slice window cell)
+                    en.x, en.y,                       // Canvas positioning grid target vectors
+                    288, 288                          // Render size bounding dimensions
                 );
             }
-
-            // Cyan selection ring is completely cleared out here!
 
             if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
                 let pDx = en.x - gameState.playerX;
