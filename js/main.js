@@ -386,25 +386,17 @@ joinMasterBtn.addEventListener('click', () => {
     if (!roomCode) return alert("Please enter a room code first!");
     initMultiplayer('alien-master', roomCode);
 
-    // FIXED: Forces the network host engine to drop a starter puppet drone immediately on handshake load
-    setTimeout(() => {
-        if (gameState.peerConnection && gameState.peerConnection.open) {
-            let starterId = "master-starter-" + Math.floor(Math.random() * 10000);
-            gameState.peerConnection.send({
-                type: 'SPAWN_ALIEN',
-                id: starterId,
-                enemyType: 1,
-                x: 1250,
-                y: 1250
-            });
-            gameState.controlledEnemyId = starterId;
-            console.log("Starter target alien generated and auto-locked!");
-        }
-    }, 1500);
-
+    // FIXED: Let the rendering loops spin up fully, THEN make a secure network request for a puppet unit
     startScreen.style.display = 'none';
     initInput();
     gameLoop();
+
+    setTimeout(() => {
+        if (gameState.peerConnection && gameState.peerConnection.open) {
+            gameState.peerConnection.send({ type: 'REQUEST_STARTER' });
+            console.log("Secure active loop handshake requested starter.");
+        }
+    }, 2000); 
 });
 
 window.addEventListener('keydown', e => { if (e.key === 'Enter') startGame(); });

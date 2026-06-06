@@ -30,18 +30,29 @@ function setupConnection(conn) {
 
         // --- SURVIVOR (WIFE / FARMER) SIDE INTERCEPTS PACKETS ---
         if (gameState.playerRole === 'farmer') {
+            // FIXED: Master client requested a guaranteed starter puppet drone
+            if (data.type === 'REQUEST_STARTER') {
+                console.log("Master requested an active starter puppet drone!");
+                let starterId = "master-starter-" + Math.floor(Math.random() * 10000);
+                const newEnemy = createEnemy(1); // Basic Scout
+                if (newEnemy) {
+                    newEnemy.id = starterId;
+                    newEnemy.x = 1250;
+                    newEnemy.y = 1250;
+                    newEnemy.isLocallyControlled = false;
+                    gameState.enemies.push(newEnemy);
+                    
+                    // Reply back to assign auto-possession
+                    conn.send({ type: 'ASSIGN_STARTER', id: starterId });
+                }
+            }
             if (data.type === 'SPAWN_ALIEN') {
-                console.log(`Master requested instant spawn: Type ${data.enemyType}`);
-                
-                // Construct the entity inside the Host engine authoritatively
                 const newEnemy = createEnemy(data.enemyType);
                 if (newEnemy) {
                     newEnemy.id = data.id; 
                     newEnemy.x = data.x;
                     newEnemy.y = data.y;
                     newEnemy.isLocallyControlled = false; 
-                    
-                    // Push straight into her living map array stack loop
                     gameState.enemies.push(newEnemy);
                 }
             }
@@ -57,6 +68,10 @@ function setupConnection(conn) {
         
         // --- HUSBAND (ALIEN MASTER) SIDE INTERCEPTS PACKETS ---
         if (gameState.playerRole === 'alien-master') {
+            if (data.type === 'ASSIGN_STARTER') {
+                gameState.controlledEnemyId = data.id;
+                console.log(`Neural link confirmed! Possessing starter drone: ${data.id}`);
+            }
             if (data.type === 'SEED_STOLEN') {
                 gameState.alienMasterSeeds++;
             }
@@ -76,8 +91,6 @@ function setupConnection(conn) {
                 gameState.activeGrenades = data.activeGrenades;
                 gameState.carryingGrenade = data.carryingGrenade;
                 gameState.guns = data.guns;
-                
-                // Sync hotbar properties
                 gameState.activeSlot = data.activeSlot;
                 gameState.inventory = data.inventory;
                 gameState.hasScythe = data.hasScythe;
