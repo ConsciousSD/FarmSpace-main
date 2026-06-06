@@ -21,10 +21,10 @@ function gameLoop() {
     let patchLifetime = 15000;
     gameState.plowedPatches = gameState.plowedPatches.filter(patch => {
         let hasCrop = gameState.plantedWatermelons.some(wm => {
-            return Math.abs((wm.x + 144) - (patch.x + 75)) < 80 &&
-                Math.abs((wm.y + 144) - (patch.y + 75)) < 80;
+            return Math.abs((wm.x + 144) - (patch.x + 75)) < 80 && 
+                   Math.abs((wm.y + 144) - (patch.y + 75)) < 80;
         });
-        if (hasCrop) return true;
+        if (hasCrop) return true; 
         return (Date.now() - patch.createdAt) < patchLifetime;
     });
 
@@ -64,16 +64,16 @@ function gameLoop() {
     // --- HOTBAR HUD SYSTEM ---
     let boxSize = 80; let boxPadding = 15;
     let totalWidth = (boxSize * 5) + (boxPadding * 4);
-    let startX = (CANVAS_WIDTH / 2) - (totalWidth / 2); let startY = 30;
+    let startX = (CANVAS_WIDTH / 2) - (totalWidth / 2); let startY = 30; 
 
     for (let j = 0; j < 5; j++) {
         let boxX = startX + (j * (boxSize + boxPadding));
         if (j === gameState.activeSlot) {
             ctx.fillStyle = 'rgba(230, 180, 40, 0.85)'; ctx.fillRect(boxX - 4, startY - 4, boxSize + 8, boxSize + 8);
-            ctx.fillStyle = 'rgba(60, 50, 40, 0.9)';
+            ctx.fillStyle = 'rgba(60, 50, 40, 0.9)'; 
         } else {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.fillRect(boxX - 2, startY - 2, boxSize + 4, boxSize + 4);
-            ctx.fillStyle = 'rgba(20, 20, 20, 0.8)';
+            ctx.fillStyle = 'rgba(20, 20, 20, 0.8)'; 
         }
         ctx.fillRect(boxX, startY, boxSize, boxSize);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'; ctx.font = '22px Arial'; ctx.fillText(j + 1, boxX + 8, startY + 24);
@@ -108,7 +108,7 @@ function gameLoop() {
     // Weapon ground collisions
     gameState.guns.forEach((g, i) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 600, 600);
-        if (checkCollision(player, { x: g.x, y: g.y, width: 600, height: 600, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) {
+        if (checkCollision(player, { x: g.x, y: g.y, width: 600, height: 600, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { 
             gameState.guns.splice(i, 1); seedPickupSound.play(); gameState.ammo = 100;
             if (!gameState.inventory.includes('gun')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; }
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
@@ -155,9 +155,9 @@ function gameLoop() {
         } else {
             let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
             let moveDir = (gameState.isPowered || (gameState.hasGun && gameState.isShooting)) ? -1 : 1;
-
+            
             if (!en.isLocallyControlled) {
-                en.x += (dx / dist) * en.speed * moveDir;
+                en.x += (dx / dist) * en.speed * moveDir; 
                 en.y += (dy / dist) * en.speed * moveDir;
             }
 
@@ -171,19 +171,20 @@ function gameLoop() {
             });
 
             en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
-
-            let enemyImage = en.img;
-
-            if (!enemyImage) {
-                if (en.type === 2) enemyImage = enemyDeathSprite2;
-                else if (en.type === 3) enemyImage = chickenSprite;
-                else enemyImage = corralSprite;
+            
+            // FIXED: If en.img drops over network serialization packets, point it directly to our cached graphics!
+            let enemyImage = en.img; 
+            if (!enemyImage || typeof enemyImage.drawImage === 'function') {
+                if (en.type === 2) enemyImage = enemyDeathSprite2; 
+                else if (en.type === 3) enemyImage = chickenSprite; 
+                else enemyImage = enemyDeathSprite; // Force pulls your live local layout sprite sheets!
             }
 
             if (en.type === 2) ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
             else if (en.type === 3) ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
             else ctx.drawImage(enemyImage, en.fIdx * 288, 0, 288, 288, en.x, en.y, 288, 288);
 
+            // Renders the glowing Cyan tracking halo ring around your current selected puppet drone
             if (gameState.isMultiplayer && gameState.controlledEnemyId === en.id) {
                 ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(en.x + 144, en.y + 144, 150, 0, Math.PI * 2); ctx.stroke();
             }
@@ -248,7 +249,7 @@ function gameLoop() {
         let bobbing = Math.sin(gameState.gameFrame * 0.08) * 12;
         ctx.drawImage(charmSprite, charm.x, charm.y + bobbing, charm.width, charm.height);
         if (checkCollision(player, { x: charm.x, y: charm.y, width: charm.width, height: charm.height }, true)) {
-            gameState.charms.splice(i, 1); seedPickupSound.play(); gameState.enemyKillScore += 5;
+            gameState.charms.splice(i, 1); seedPickupSound.play(); gameState.enemyKillScore += 5; 
         }
     });
 
@@ -283,7 +284,7 @@ function gameLoop() {
     // --- HUD AND METRIC PRINTS ---
     ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(10, 10, 850, 240);
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
-
+    
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
         ctx.fillStyle = '#00ffff'; ctx.fillText(`ALIEN TARGET SELECTION SYSTEM`, 30, 60);
     } else {
@@ -372,51 +373,37 @@ function startGame() {
     gameLoop();
 }
 
-// =======================================================
-// HARDENED MULTIPLAYER ENGINE ENTRY POINT TRIGGERS
-// =======================================================
 startButton.addEventListener('click', startGame);
 
 hostFarmerBtn.addEventListener('click', () => {
     const roomCode = roomCodeInput.value.trim().toLowerCase();
     if (!roomCode) return alert("Please enter a room code first!");
-
     initMultiplayer('farmer', roomCode);
-    startGame(); // Boots her local loops and sets up the canvas layers
+    startGame();
 });
 
 joinMasterBtn.addEventListener('click', () => {
     const roomCode = roomCodeInput.value.trim().toLowerCase();
     if (!roomCode) return alert("Please enter a room code first!");
-
+    
     initMultiplayer('alien-master', roomCode);
 
-    // Hide menus and start your viewing monitor frame loop context
     startScreen.style.display = 'none';
     initInput();
     gameLoop();
 
-    // FIXED: Instead of relying on a fragile network packet request,
-    // your machine will instantly generate a dummy placeholder target
-    // directly inside your local tracking array to guarantee you have a puppet drone!
-    let starterId = "master-starter-" + Math.floor(Math.random() * 10000);
-
-    gameState.enemies.push({
-        id: starterId,
-        type: 1,      // Basic Scout
-        x: 1250,      // Perfect map center coordinate orientation placement
-        y: 1250,
-        speed: 3,
-        health: 1,
-        fIdx: 0,
-        fT: 0,
-        width: 288,
-        height: 288,
-        isLocallyControlled: true // Unlocks your arrow keys immediately!
-    });
-
-    gameState.controlledEnemyId = starterId;
-    console.log("Local standalone placeholder drone force-injected into view!");
+    // FIXED: Instead of faking a local drone, we blast a network packet to her machine
+    // telling her engine to drop an AUTHORITATIVE alien on her map grid center instantly!
+    setTimeout(() => {
+        if (gameState.peerConnection && gameState.peerConnection.open) {
+            let uniqueDroneId = "master-drone-" + Math.floor(Math.random() * 99999);
+            gameState.peerConnection.send({
+                type: 'FORCE_HOST_SPAWN',
+                id: uniqueDroneId
+            });
+            console.log("Blasted authoritative alien request to Host!");
+        }
+    }, 1500); 
 });
 
 window.addEventListener('keydown', e => { if (e.key === 'Enter') startGame(); });
