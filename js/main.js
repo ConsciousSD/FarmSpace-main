@@ -16,13 +16,43 @@ setInterval(() => {
     }
 }, 60000);
 
+// Helper method to execute a client master drone respawn over the link lane
+function dispatchMasterVesselSpawn() {
+    let uniqueDroneId = "master-drone-" + Math.floor(Math.random() * 99999);
+    gameState.controlledEnemyId = uniqueDroneId;
+    gameState.isAlienDead = false;
+    gameState.alienRespawnTimer = 0;
+
+    // Push local reference structural placeholder
+    gameState.enemies.push({
+        id: uniqueDroneId,
+        type: 1,
+        x: 1250,
+        y: 1250,
+        fIdx: 0,
+        fT: 0,
+        width: 288,
+        height: 288
+    });
+
+    if (gameState.peerConnection && gameState.peerConnection.open) {
+        try {
+            gameState.peerConnection.send({
+                type: 'SPAWN_MASTER_VESSEL',
+                id: uniqueDroneId
+            });
+            console.log("Sent fresh master vessel spawn request to host.");
+        } catch (err) {
+            console.warn("Could not sync master vessel spawn over network:", err);
+        }
+    }
+}
+
 // Reset game variables safely in memory without killing the room session connection
 export function resetGameSession() {
-    // 0. Hard stop and purge all active loop background tasks to prevent stacking speed bugs
     gameIntervals.forEach(clearInterval);
     gameIntervals = [];
 
-    // 1. Force state flags back to active play mode instantly
     gameState.isGameOver = false;
     gameState.isPaused = false;
     gameState.enemyKillScore = 0;
@@ -33,8 +63,11 @@ export function resetGameSession() {
     gameState.hasGun = false;
     gameState.gunCoolDownActive = false;
     gameState.killsSinceEmpty = 0;
+    
+    // Reset client side respawn trackers
+    gameState.isAlienDead = false;
+    gameState.alienRespawnTimer = 0;
 
-    // Core placement re-initialization
     gameState.playerX = 500;
     gameState.playerY = 500;
     player.x = 500;
@@ -45,7 +78,6 @@ export function resetGameSession() {
     gameState.hasScythe = true;
     gameState.scytheDurability = gameState.maxScytheDurability;
 
-    // Clear tracking fields cleanly
     gameState.enemies = [];
     gameState.plowedPatches = [];
     gameState.plantedWatermelons = [];
@@ -58,48 +90,19 @@ export function resetGameSession() {
     gameState.carryingGrenade = false;
     gameState.guns = [];
 
-    // Respawn the client master drone instance securely if playerRole is alien-master
     if (gameState.playerRole === 'alien-master') {
-        let uniqueDroneId = gameState.controlledEnemyId || ("master-drone-" + Math.floor(Math.random() * 99999));
-        gameState.controlledEnemyId = uniqueDroneId;
-
-        gameState.enemies.push({
-            id: uniqueDroneId,
-            type: 1,
-            x: 1250,
-            y: 1250,
-            fIdx: 0,
-            fT: 0,
-            width: 288,
-            height: 288
-        });
-
-        if (gameState.peerConnection && gameState.peerConnection.open) {
-            try {
-                gameState.peerConnection.send({
-                    type: 'SPAWN_MASTER_VESSEL',
-                    id: uniqueDroneId
-                });
-            } catch (err) {
-                console.warn("Could not sync master vessel spawn over network:", err);
-            }
-        }
+        dispatchMasterVesselSpawn();
     }
 
-    // 2. Restart the AI wave spawn ticker safely on the host machine
     if (gameState.playerRole === 'farmer') {
         clearTimeout(window.spawnTickTimeout);
         spawnTick();
-        
-        // Spin up fresh asset deployment generators now that the old space is empty
         startTrackingIntervals();
     }
 
-    // 3. FIXED RENDERING TRIGGER: Clear old screen artifacts and kick the rendering loop back to life!
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     gameLoop(); 
 
-    // Force focus instantly back onto window so key down fires seamlessly
     window.focus();
     console.log("LOBBY RETAINED: Soft session restart processed cleanly.");
 }
@@ -210,22 +213,25 @@ function gameLoop() {
 
     // --- ALIEN MASTER CONTROLLER TRACKING INTERCEPT ---
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && gameState.peerConnection && gameState.peerConnection.open) {
-        let myDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
-        if (myDrone) {
-            if (gameState.moveLeft) myDrone.x -= 7; if (gameState.moveRight) myDrone.x += 7;
-            if (gameState.moveUp) myDrone.y -= 7; if (gameState.moveDown) myDrone.y += 7;
+        // Only allow positional changes if the player is currently alive
+        if (!gameState.isAlienDead) {
+            let myDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
+            if (myDrone) {
+                if (gameState.moveLeft) myDrone.x -= 7; if (gameState.moveRight) myDrone.x += 7;
+                if (gameState.moveUp) myDrone.y -= 7; if (gameState.moveDown) myDrone.y += 7;
 
-            myDrone.x = Math.max(0, Math.min(CANVAS_WIDTH - 288, myDrone.x));
-            myDrone.y = Math.max(0, Math.min(CANVAS_HEIGHT - 288, myDrone.y));
+                myDrone.x = Math.max(0, Math.min(CANVAS_WIDTH - 288, myDrone.x));
+                myDrone.y = Math.max(0, Math.min(CANVAS_HEIGHT - 288, myDrone.y));
 
-            try {
-                gameState.peerConnection.send({
-                    type: 'CONTROL_MOVE',
-                    id: gameState.controlledEnemyId,
-                    x: Math.round(myDrone.x),
-                    y: Math.round(myDrone.y)
-                });
-            } catch(e) {}
+                try {
+                    gameState.peerConnection.send({
+                        type: 'CONTROL_MOVE',
+                        id: gameState.controlledEnemyId,
+                        x: Math.round(myDrone.x),
+                        y: Math.round(myDrone.y)
+                    });
+                } catch(e) {}
+            }
         }
     }
 
@@ -293,17 +299,23 @@ function gameLoop() {
                 let deathImg, sW, sH, dH;
                 if (en.type === 2) { deathImg = enemyDeathSprite2; sW = 128; sH = 128; dH = 432; } else { deathImg = enemyDeathSprite; sW = 64; sH = 64; dH = 288; }
                 ctx.drawImage(deathImg, col * sW, row * sH, sW, sH, en.x, en.y, 288, dH);
-            } else gameState.enemies.splice(i, 1);
+            } else {
+                // If the client's master drone just finished its death animation path, trigger the 10s cooldown
+                if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && en.id === gameState.controlledEnemyId) {
+                    gameState.isAlienDead = true;
+                    gameState.alienRespawnTimer = Date.now() + 10000; // Block access for exactly 10 seconds
+                }
+                gameState.enemies.splice(i, 1);
+            }
         } else {
             let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
             let moveDir = (gameState.isPowered || (gameState.hasGun && gameState.isShooting)) ? -1 : 1;
 
             let isPlayerControlledDrone = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
 
-            // --- FIXED SMOOTH RENDERING MATH BLOCK ---
             if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
                 if (en.targetX !== undefined && !isPlayerControlledDrone) {
-                    en.x += (en.targetX - en.x) * 0.18; // Apply 18% closure easing value per frame
+                    en.x += (en.targetX - en.x) * 0.18; 
                     en.y += (en.targetY - en.y) * 0.18;
                 }
             } else {
@@ -313,7 +325,6 @@ function gameLoop() {
                 }
             }
 
-            // --- EXPLICIT STOLEN SEED DETECTOR CORE ---
             gameState.seeds.forEach((s, sIdx) => {
                 if (Math.hypot((en.x + 144) - s.x, (en.y + 144) - s.y) < 150) {
                     gameState.seeds.splice(sIdx, 1);
@@ -465,6 +476,27 @@ function gameLoop() {
 
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
         ctx.fillStyle = '#00ffff'; ctx.fillText(`神经网络链接: VERSUS PILOT ACTIVE`, 30, 60);
+        
+        // --- FIXED ALIEN RESPAWN HUD OVERLAY ---
+        if (gameState.isAlienDead) {
+            let remainingTime = Math.max(0, Math.ceil((gameState.alienRespawnTimer - Date.now()) / 1000));
+            ctx.save();
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 70px Arial';
+            ctx.fillText(`MASTER VESSEL DESTROYED`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40);
+            ctx.fillStyle = '#00ffff';
+            ctx.font = '50px Arial';
+            ctx.fillText(`RESPAWNING IN: ${remainingTime}s`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 50);
+            ctx.restore();
+
+            // Self execute respawn call when clock hits threshold bounds
+            if (Date.now() >= gameState.alienRespawnTimer) {
+                dispatchMasterVesselSpawn();
+            }
+        }
     } else {
         ctx.fillText(`Seeds: ${gameState.seedInventory} | Kills: ${gameState.enemyKillScore} | Saved: ${gameState.pigsSaved}`, 30, 60);
     }
@@ -525,7 +557,6 @@ function gameLoop() {
 function spawnTick() {
     if (gameState.isPaused || gameState.isGameOver) return;
 
-    // --- AUTOMATED TICK BLOCKER ---
     if (gameState.isMultiplayer) {
         window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
         return;
@@ -587,36 +618,11 @@ joinMasterBtn.addEventListener('click', () => {
     if (!roomCode) return alert("Please enter a room code first!");
 
     initMultiplayer('alien-master', roomCode);
-
     startScreen.style.display = 'none';
     initInput();
     gameLoop();
 
-    let uniqueDroneId = "master-drone-" + Math.floor(Math.random() * 99999);
-    gameState.controlledEnemyId = uniqueDroneId;
-
-    gameState.enemies.push({
-        id: uniqueDroneId,
-        type: 1,
-        x: 1250,
-        y: 1250,
-        fIdx: 0,
-        fT: 0,
-        width: 288,
-        height: 288
-    });
-
-    setTimeout(() => {
-        if (gameState.peerConnection && gameState.peerConnection.open) {
-            try {
-                gameState.peerConnection.send({
-                    type: 'SPAWN_MASTER_VESSEL',
-                    id: uniqueDroneId
-                });
-                console.log("Blasted authoritative alien request to Host!");
-            } catch(e) {}
-        }
-    }, 1500);
+    dispatchMasterVesselSpawn();
 });
 
 window.addEventListener('keydown', e => {

@@ -34,17 +34,18 @@ function setupConnection(conn) {
         if (gameState.playerRole === 'farmer') {
             if (data.type === 'SPAWN_MASTER_VESSEL') {
                 console.log(`Spawning host puppet instance for Master Drone: ${data.id}`);
-                let masterAlien = gameState.enemies.find(e => e.id === data.id);
-                if (!masterAlien) {
-                    masterAlien = createEnemy(1); 
-                    if (masterAlien) {
-                        masterAlien.id = data.id;
-                        masterAlien.x = 1250; 
-                        masterAlien.y = 1250;
-                        masterAlien.speed = 0; 
-                        masterAlien.isLocallyControlled = true; 
-                        gameState.enemies.push(masterAlien);
-                    }
+                
+                // Clear any lingering instances of old master drone entities first
+                gameState.enemies = gameState.enemies.filter(e => !e.id.startsWith("master-drone-"));
+
+                let masterAlien = createEnemy(1); 
+                if (masterAlien) {
+                    masterAlien.id = data.id;
+                    masterAlien.x = 1250; 
+                    masterAlien.y = 1250;
+                    masterAlien.speed = 0; 
+                    masterAlien.isLocallyControlled = true; 
+                    gameState.enemies.push(masterAlien);
                 }
             }
 
@@ -66,7 +67,6 @@ function setupConnection(conn) {
                 }
             }
 
-            // FIXED: Proportional multi-spawn algorithm deployment (3 seeds stolen = 3 grunts spawn)
             if (data.type === 'SEED_STOLEN') {
                 let possible = [1];
                 if (gameState.enemyKillScore >= 20) possible.push(2);
@@ -110,7 +110,6 @@ function setupConnection(conn) {
                             type: parseInt(ne.type) || 1,
                             x: parseInt(ne.x),
                             y: parseInt(ne.y),
-                            // Initialize target locations to slide interpolation values seamlessly
                             targetX: parseInt(ne.x),
                             targetY: parseInt(ne.y),
                             fIdx: 0,
@@ -122,12 +121,13 @@ function setupConnection(conn) {
                         };
                         gameState.enemies.push(localEn);
                     } else {
-                        // Forward fields into vectors instead of snapping step boundaries
                         localEn.targetX = ne.x;
                         localEn.targetY = ne.y;
                         localEn.isDying = ne.isDying;
                     }
                 });
+                
+                // Keep entities matching unless it's our own drone (which we manage locally)
                 gameState.enemies = gameState.enemies.filter(le => data.enemies.some(ne => ne.id === le.id) || le.id === gameState.controlledEnemyId);
             }
             if (data.type === 'SYNC_FARMER') {
