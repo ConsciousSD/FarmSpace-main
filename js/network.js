@@ -1,6 +1,7 @@
 import { gameState } from './state.js';
 import { createEnemy, triggerGameOver } from './helpers.js';
 import { shootSound, moveSound } from './audio.js';
+import { resetGameSession } from './main.js'; // Imported session reset wrapper
 
 export function initMultiplayer(role, roomCode) {
     gameState.isMultiplayer = true;
@@ -65,9 +66,10 @@ function setupConnection(conn) {
                 }
             }
 
-            // Client requested a master level restart
-            if (data.type === 'REQUEST_RESTART') {
-                window.location.reload(); 
+            // Catch remote restart request on host machine
+            if (data.type === 'EXECUTE_SHARED_RESTART') {
+                console.log("Remote client requested session soft-reset.");
+                resetGameSession();
             }
         }
         
@@ -75,9 +77,14 @@ function setupConnection(conn) {
         if (gameState.playerRole === 'alien-master') {
             if (data.type === 'GAME_OVER_TRIGGER') {
                 console.log("Host reports a fatal collision! Freezing client field.");
-                // Pulls up the Game Over UI screen overlay on your laptop instantly
                 gameState.isGameOver = true; 
                 if (typeof triggerGameOver === 'function') triggerGameOver();
+            }
+
+            // Catch remote restart instruction from host machine
+            if (data.type === 'EXECUTE_SHARED_RESTART') {
+                console.log("Host executed session soft-reset.");
+                resetGameSession();
             }
 
             if (data.type === 'SYNC_ENEMIES') {
