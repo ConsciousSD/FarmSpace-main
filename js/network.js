@@ -30,53 +30,41 @@ function setupConnection(conn) {
 
         // --- SURVIVOR (WIFE / FARMER) SIDE INTERCEPTS PACKETS ---
         if (gameState.playerRole === 'farmer') {
-            // FIXED: Master client requested a guaranteed starter puppet drone
-            if (data.type === 'REQUEST_STARTER') {
-                console.log("Master requested an active starter puppet drone!");
-                let starterId = "master-starter-" + Math.floor(Math.random() * 10000);
-                const newEnemy = createEnemy(1); // Basic Scout
-                if (newEnemy) {
-                    newEnemy.id = starterId;
-                    newEnemy.x = 1250;
-                    newEnemy.y = 1250;
-                    newEnemy.isLocallyControlled = false;
-                    gameState.enemies.push(newEnemy);
-                    
-                    // Reply back to assign auto-possession
-                    conn.send({ type: 'ASSIGN_STARTER', id: starterId });
-                }
-            }
-            if (data.type === 'SPAWN_ALIEN') {
-                const newEnemy = createEnemy(data.enemyType);
-                if (newEnemy) {
-                    newEnemy.id = data.id; 
-                    newEnemy.x = data.x;
-                    newEnemy.y = data.y;
-                    newEnemy.isLocallyControlled = false; 
-                    gameState.enemies.push(newEnemy);
-                }
-            }
+            // Catches your move packets and forces her map to move your puppet drone
             if (data.type === 'CONTROL_MOVE') {
                 let targetedAlien = gameState.enemies.find(e => e.id === data.id);
-                if (targetedAlien) {
-                    targetedAlien.x = data.x;
-                    targetedAlien.y = data.y;
-                    targetedAlien.isLocallyControlled = true; 
+                
+                if (!targetedAlien) {
+                    // If her machine doesn't have this drone in her list yet, 
+                    // force her system to append it instantly!
+                    targetedAlien = createEnemy(1);
+                    targetedAlien.id = data.id;
+                    gameState.enemies.push(targetedAlien);
                 }
+                
+                targetedAlien.x = data.x;
+                targetedAlien.y = data.y;
+                targetedAlien.isLocallyControlled = true; 
             }
         }
         
         // --- HUSBAND (ALIEN MASTER) SIDE INTERCEPTS PACKETS ---
         if (gameState.playerRole === 'alien-master') {
-            if (data.type === 'ASSIGN_STARTER') {
-                gameState.controlledEnemyId = data.id;
-                console.log(`Neural link confirmed! Possessing starter drone: ${data.id}`);
-            }
             if (data.type === 'SEED_STOLEN') {
                 gameState.alienMasterSeeds++;
             }
             if (data.type === 'SYNC_ENEMIES') {
-                gameState.enemies = data.enemies;
+                // If you are already controlling a local puppet drone, 
+                // protect it from getting overwritten by her empty list arrays!
+                if (gameState.controlledEnemyId) {
+                    let activeDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
+                    gameState.enemies = data.enemies;
+                    if (activeDrone && !gameState.enemies.some(e => e.id === gameState.controlledEnemyId)) {
+                        gameState.enemies.push(activeDrone);
+                    }
+                } else {
+                    gameState.enemies = data.enemies;
+                }
             }
             if (data.type === 'SYNC_FARMER') {
                 gameState.playerX = data.playerX;
