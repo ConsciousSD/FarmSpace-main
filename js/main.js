@@ -285,7 +285,7 @@ function gameLoop() {
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
     
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
-        ctx.fillStyle = '#00ffff'; ctx.fillText(`ALIEN COMMODITY POOL: ${gameState.alienMasterSeeds} SPAWNS`, 30, 60);
+        ctx.fillStyle = '#00ffff'; ctx.fillText(`ALIEN TARGET SELECTION SYSTEM`, 30, 60);
     } else {
         ctx.fillText(`Seeds: ${gameState.seedInventory} | Kills: ${gameState.enemyKillScore} | Saved: ${gameState.pigsSaved}`, 30, 60);
     }
@@ -312,7 +312,6 @@ function gameLoop() {
             enemies: gameState.enemies.map(en => ({ id: en.id, x: en.x, y: en.y, type: en.type, fIdx: en.fIdx }))
         });
 
-        // FIXED: Expanded the payload variables package to cleanly send weapon state down to your tab screen!
         gameState.peerConnection.send({
             type: 'SYNC_FARMER',
             playerX: gameState.playerX,
@@ -327,8 +326,6 @@ function gameLoop() {
             activeGrenades: gameState.activeGrenades,
             carryingGrenade: gameState.carryingGrenade,
             guns: gameState.guns,
-            
-            // Sync inventory data blocks
             activeSlot: gameState.activeSlot,
             inventory: gameState.inventory,
             hasScythe: gameState.hasScythe,
@@ -388,12 +385,11 @@ joinMasterBtn.addEventListener('click', () => {
     const roomCode = roomCodeInput.value.trim().toLowerCase();
     if (!roomCode) return alert("Please enter a room code first!");
     initMultiplayer('alien-master', roomCode);
-    
-    gameState.alienMasterSeeds = 1;
 
+    // FIXED: Forces the network host engine to drop a starter puppet drone immediately on handshake load
     setTimeout(() => {
-        if (gameState.peerConnection) {
-            let starterId = "starter-alien-" + Math.floor(Math.random() * 1000);
+        if (gameState.peerConnection && gameState.peerConnection.open) {
+            let starterId = "master-starter-" + Math.floor(Math.random() * 10000);
             gameState.peerConnection.send({
                 type: 'SPAWN_ALIEN',
                 id: starterId,
@@ -402,9 +398,9 @@ joinMasterBtn.addEventListener('click', () => {
                 y: 1250
             });
             gameState.controlledEnemyId = starterId;
-            console.log("Starter alien spawned and possessed!");
+            console.log("Starter target alien generated and auto-locked!");
         }
-    }, 1200);
+    }, 1500);
 
     startScreen.style.display = 'none';
     initInput();

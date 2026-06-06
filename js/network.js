@@ -31,9 +31,9 @@ function setupConnection(conn) {
         // --- SURVIVOR (WIFE / FARMER) SIDE INTERCEPTS PACKETS ---
         if (gameState.playerRole === 'farmer') {
             if (data.type === 'SPAWN_ALIEN') {
-                console.log(`Master requested spawn: Type ${data.enemyType}`);
+                console.log(`Master requested instant spawn: Type ${data.enemyType}`);
                 
-                // FIXED: Create the alien directly on the Host engine space
+                // Construct the entity inside the Host engine authoritatively
                 const newEnemy = createEnemy(data.enemyType);
                 if (newEnemy) {
                     newEnemy.id = data.id; 
@@ -41,7 +41,7 @@ function setupConnection(conn) {
                     newEnemy.y = data.y;
                     newEnemy.isLocallyControlled = false; 
                     
-                    // Force push into her active game array stack layout
+                    // Push straight into her living map array stack loop
                     gameState.enemies.push(newEnemy);
                 }
             }
@@ -77,7 +77,7 @@ function setupConnection(conn) {
                 gameState.carryingGrenade = data.carryingGrenade;
                 gameState.guns = data.guns;
                 
-                // FIXED: Sync her hotbar parameters down to your screen monitor layout
+                // Sync hotbar properties
                 gameState.activeSlot = data.activeSlot;
                 gameState.inventory = data.inventory;
                 gameState.hasScythe = data.hasScythe;
