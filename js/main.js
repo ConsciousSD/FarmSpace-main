@@ -9,12 +9,28 @@ import { initMultiplayer } from './network.js';
 // Global reference array to completely track and destroy intervals on reset
 let gameIntervals = [];
 
+// Initialize damage number tracker array globally if not present in baseline state
+if (!gameState.damageNumbers) gameState.damageNumbers = [];
+
 // Setup difficulty scaling intervals
 setInterval(() => {
     if (!gameState.isPaused && !gameState.isGameOver && !gameState.isMultiplayer) {
         gameState.spawnRateMultiplier *= 0.90;
     }
 }, 60000);
+
+// Helper function to spin up a floating particle number over a target
+function createDamageNumber(x, y, amount, isCritical = false) {
+    gameState.damageNumbers.push({
+        x: x + Math.random() * 60 - 30, // slight random horizontal offset
+        y: y - 10,
+        text: amount,
+        color: isCritical ? '#ffcc00' : '#00ffff',
+        size: isCritical ? 38 : 28,
+        alpha: 1.0,
+        vY: -2.5 - Math.random() * 1.5 // upward floating velocity vector
+    });
+}
 
 // Helper method to execute a client master drone respawn over the link lane
 function dispatchMasterVesselSpawn() {
@@ -32,7 +48,7 @@ function dispatchMasterVesselSpawn() {
         fT: 0,
         width: 288,
         height: 288,
-        health: 5 // Initial baseline health assignment
+        health: 500 // NUMERICAL SYSTEM: 500 total HP for Boss scaling
     });
 
     if (gameState.peerConnection && gameState.peerConnection.open) {
@@ -63,7 +79,7 @@ export function resetGameSession() {
     gameState.hasGun = false;
     gameState.gunCoolDownActive = false;
     gameState.killsSinceEmpty = 0;
-
+    
     gameState.isAlienDead = false;
     gameState.alienRespawnTimer = 0;
 
@@ -78,6 +94,7 @@ export function resetGameSession() {
     gameState.scytheDurability = gameState.maxScytheDurability;
 
     gameState.enemies = [];
+    gameState.damageNumbers = []; // Clear popups
     gameState.plowedPatches = [];
     gameState.plantedWatermelons = [];
     gameState.seeds = [];
@@ -100,7 +117,7 @@ export function resetGameSession() {
     }
 
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    gameLoop();
+    gameLoop(); 
 
     window.focus();
     console.log("LOBBY RETAINED: Soft session restart processed cleanly.");
@@ -206,7 +223,7 @@ function gameLoop() {
         if (localIsMoving) {
             moveSound.play().catch(() => { });
         } else {
-            try { moveSound.pause(); } catch (e) { }
+            try { moveSound.pause(); } catch(e) {}
         }
     }
 
@@ -228,7 +245,7 @@ function gameLoop() {
                         x: Math.round(myDrone.x),
                         y: Math.round(myDrone.y)
                     });
-                } catch (e) { }
+                } catch(e) {}
             }
         }
     }
@@ -237,8 +254,8 @@ function gameLoop() {
     gameState.guns.forEach((g, i) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 160, 160);
         if (checkCollision(player, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
-            gameState.guns.splice(i, 1);
-            seedPickupSound.play().catch(() => { });
+            gameState.guns.splice(i, 1); 
+            seedPickupSound.play().catch(() => {}); 
             gameState.ammo = 100;
             if (!gameState.inventory.includes('gun')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; }
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
@@ -246,27 +263,27 @@ function gameLoop() {
     });
     gameState.seeds.forEach((s, i) => {
         ctx.drawImage(seedSprite, 0, (Math.floor(gameState.gameFrame / 10) % 2) * 288, 288, 288, s.x, s.y, 288, 288);
-        if (checkCollision(player, { x: s.x, y: s.y, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70 }, true)) {
-            gameState.seedInventory++;
-            gameState.seeds.splice(i, 1);
-            seedPickupSound.play().catch(() => { });
+        if (checkCollision(player, { x: s.x, y: s.y, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70 }, true)) { 
+            gameState.seedInventory++; 
+            gameState.seeds.splice(i, 1); 
+            seedPickupSound.play().catch(() => {}); 
         }
     });
     gameState.tires.forEach((t, i) => {
         ctx.drawImage(tireSprite, 0, (Math.floor(gameState.gameFrame / 15) % 2) * 300, 300, 300, t.x, t.y, 300, 300);
-        if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) {
-            gameState.isPowered = true;
-            gameState.powerTimer = Date.now();
-            gameState.tires.splice(i, 1);
-            tirePickupSound.play().catch(() => { });
+        if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { 
+            gameState.isPowered = true; 
+            gameState.powerTimer = Date.now(); 
+            gameState.tires.splice(i, 1); 
+            tirePickupSound.play().catch(() => {}); 
         }
     });
 
     gameState.scythes.forEach((s, i) => {
         ctx.drawImage(scytheSprite, s.x, s.y, 300, 300);
         if (checkCollision(player, { x: s.x, y: s.y, width: 300, height: 300, hitboxOffsetX: 30, hitboxOffsetY: 30 }, true)) {
-            gameState.scythes.splice(i, 1);
-            seedPickupSound.play().catch(() => { });
+            gameState.scythes.splice(i, 1); 
+            seedPickupSound.play().catch(() => {});
             if (!gameState.inventory.includes('scythe')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'scythe'; }
             gameState.scytheDurability = gameState.maxScytheDurability;
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
@@ -275,15 +292,16 @@ function gameLoop() {
 
     if (gameState.hasGun && gameState.isShooting) {
         gameState.ammo -= 0.15;
-        if (gameState.ammo <= 0) {
-            gameState.hasGun = false;
-            gameState.isShooting = false;
-            gameState.gunCoolDownActive = true;
-            gameState.killsSinceEmpty = 0;
-            try { shootSound.pause(); } catch (e) { }
+        if (gameState.ammo <= 0) { 
+            gameState.hasGun = false; 
+            gameState.isShooting = false; 
+            gameState.gunCoolDownActive = true; 
+            gameState.killsSinceEmpty = 0; 
+            try { shootSound.pause(); } catch(e) {}
         }
     }
     if (gameState.gunCoolDownActive && gameState.killsSinceEmpty >= 10) { gameState.gunCoolDownActive = false; gameState.killsSinceEmpty = 0; }
+
     // --- ENEMIES LAYER ---
     for (let i = gameState.enemies.length - 1; i >= 0; i--) {
         let en = gameState.enemies[i];
@@ -311,7 +329,7 @@ function gameLoop() {
 
             if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
                 if (en.targetX !== undefined && !isPlayerControlledDrone) {
-                    en.x += (en.targetX - en.x) * 0.18;
+                    en.x += (en.targetX - en.x) * 0.18; 
                     en.y += (en.targetY - en.y) * 0.18;
                 }
             } else {
@@ -363,18 +381,24 @@ function gameLoop() {
                 );
             }
 
-            // --- HARDENED INDIVIDUAL I-FRAME DAMAGE TRACKER ---
+            // --- REFACTORED: NUMERICAL IN-LINE WEAPON DAMAGE CONTROLLER ---
             if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
                 let pDx = en.x - gameState.playerX;
                 if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0))) {
-
-                    // Initialize timestamp checker field if absent
+                    
                     if (!en.lastHitTime) en.lastHitTime = 0;
 
-                    // Strictly lock processing unless 250ms have elapsed since prior damage frame
-                    if (Date.now() - en.lastHitTime > 250) {
-                        en.health = (en.health !== undefined) ? en.health - 1 : 4;
-                        en.lastHitTime = Date.now(); // Reset internal I-Frame timer clock
+                    // Lowered I-Frames to 350ms because damage ticks are small (12 per hit)
+                    if (Date.now() - en.lastHitTime > 350) {
+                        let baseMax = (isPlayerControlledDrone) ? 500 : 100;
+                        if (en.health === undefined) en.health = baseMax;
+
+                        let bulletDamage = 12; // Numerical value
+                        en.health -= bulletDamage;
+                        en.lastHitTime = Date.now(); 
+
+                        // Trigger Floating Text Pop-up on local canvas
+                        createDamageNumber(en.x + 144, en.y, bulletDamage, false);
 
                         if (en.health <= 0) {
                             en.isDying = true;
@@ -388,7 +412,7 @@ function gameLoop() {
 
             // --- UNIVERSAL ALIEN PLAYER HEALTH BAR OVERLAY ---
             if (gameState.isMultiplayer && en.id === gameState.controlledEnemyId) {
-                let maxAlienHP = 5;
+                let maxAlienHP = 500; // Reflecting upgraded numerical base pool limits
                 let currentHP = en.health !== undefined ? en.health : maxAlienHP;
 
                 let barWidth = 140;
@@ -456,13 +480,13 @@ function gameLoop() {
     });
 
     if (gameState.carryingPig && checkCollision(player, gameState.corral)) {
-        gameState.pigs.splice(gameState.pigs.indexOf(gameState.carryingPig), 1); gameState.carryingPig = null; gameState.pigsSaved++;
-        watermelonPickupSound.play().catch(() => { });
+        gameState.pigs.splice(gameState.pigs.indexOf(gameState.carryingPig), 1); gameState.carryingPig = null; gameState.pigsSaved++; 
+        watermelonPickupSound.play().catch(() => {});
         gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
     }
     if (gameState.carryingChicken && checkCollision(player, gameState.corral)) {
-        gameState.chickens.splice(gameState.chickens.indexOf(gameState.carryingChicken), 1); gameState.carryingChicken = null; gameState.chickensSaved++;
-        watermelonPickupSound.play().catch(() => { });
+        gameState.chickens.splice(gameState.chickens.indexOf(gameState.carryingChicken), 1); gameState.carryingChicken = null; gameState.chickensSaved++; 
+        watermelonPickupSound.play().catch(() => {});
         gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
     }
 
@@ -470,8 +494,8 @@ function gameLoop() {
         let bobbing = Math.sin(gameState.gameFrame * 0.08) * 12;
         ctx.drawImage(charmSprite, charm.x, charm.y + bobbing, charm.width, charm.height);
         if (checkCollision(player, { x: charm.x, y: charm.y, width: charm.width, height: charm.height }, true)) {
-            gameState.charms.splice(i, 1);
-            seedPickupSound.play().catch(() => { });
+            gameState.charms.splice(i, 1); 
+            seedPickupSound.play().catch(() => {}); 
             gameState.enemyKillScore += 5;
         }
     });
@@ -482,25 +506,41 @@ function gameLoop() {
         let wmCols = 3, wmSize = 288;
         ctx.drawImage(watermelonSprite, (wm.fIdx % wmCols) * wmSize, Math.floor(wm.fIdx / wmCols) * wmSize, wmSize, wmSize, wm.x, wm.y, 288, 288);
         if (wm.done && checkCollision(player, wm) && gameState.playerRole === 'farmer') {
-            gameState.plantedWatermelons.splice(i, 1);
-            watermelonPickupSound.play().catch(() => { });
+            gameState.plantedWatermelons.splice(i, 1); 
+            watermelonPickupSound.play().catch(() => {});
             let target = gameState.enemies.find(e => !e.isDying);
-            if (target) { target.isDying = true; target.deathFrame = 0; target.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++; }
+            if (target) { 
+                let cropDamage = 150; // High explosive damage
+                target.health = (target.health !== undefined) ? target.health - cropDamage : 0;
+                createDamageNumber(target.x + 144, target.y, cropDamage, true);
+
+                if (target.health <= 0) {
+                    target.isDying = true; target.deathFrame = 0; target.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++; 
+                }
+            }
         }
     }
 
     gameState.activeGrenades.forEach((g, i) => {
         if (!g.exploded) {
             g.x += g.vX; g.y += g.vY; g.vY += 0.6; g.timer--;
-            ctx.save();
-            ctx.translate(g.x, g.y);
-            ctx.rotate(gameState.gameFrame * 0.3);
-            ctx.drawImage(grenadeSprite, -80, -80, 160, 160);
+            ctx.save(); 
+            ctx.translate(g.x, g.y); 
+            ctx.rotate(gameState.gameFrame * 0.3); 
+            ctx.drawImage(grenadeSprite, -80, -80, 160, 160); 
             ctx.restore();
             if (g.timer <= 0 && gameState.playerRole === 'farmer') {
-                g.exploded = true;
-                grenadeExplosionSound.play().catch(() => { });
-                gameState.enemies.forEach(en => { if (Math.hypot(en.x - g.x, en.y - g.y) < 450) { en.health = 0; en.isDying = true; en.deathFrame = 0; gameState.enemyKillScore++; } });
+                g.exploded = true; 
+                grenadeExplosionSound.play().catch(() => {});
+                gameState.enemies.forEach(en => { 
+                    if (Math.hypot(en.x - g.x, en.y - g.y) < 450) { 
+                        let grenadeDamage = 135; // Custom burst scaling
+                        en.health = (en.health !== undefined) ? en.health - grenadeDamage : 0;
+                        createDamageNumber(en.x + 144, en.y, grenadeDamage, true);
+
+                        if (en.health <= 0) { en.isDying = true; en.deathFrame = 0; gameState.enemyKillScore++; }
+                    } 
+                });
             }
         } else {
             ctx.fillStyle = 'rgba(255, 165, 0, 0.7)'; ctx.beginPath(); ctx.arc(g.x, g.y, 150 + (Math.random() * 50), 0, Math.PI * 2); ctx.fill();
@@ -510,13 +550,34 @@ function gameLoop() {
 
     if (gameState.carryingGrenade) ctx.drawImage(grenadeSprite, gameState.playerX + (player.facingRight ? 200 : -20), gameState.playerY + 80, 160, 160);
 
+    // --- RENDER FLOATING DAMAGE POPUPS ---
+    for (let k = gameState.damageNumbers.length - 1; k >= 0; k--) {
+        let dmgNum = gameState.damageNumbers[k];
+        dmgNum.y += dmgNum.vY;
+        dmgNum.alpha -= 0.025; // fade effect
+
+        if (dmgNum.alpha <= 0) {
+            gameState.damageNumbers.splice(k, 1);
+        } else {
+            ctx.save();
+            ctx.globalAlpha = dmgNum.alpha;
+            ctx.fillStyle = dmgNum.color;
+            ctx.font = `bold ${dmgNum.size}px Impact, Arial Black`;
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 4;
+            ctx.strokeText(dmgNum.text, dmgNum.x, dmgNum.y);
+            ctx.fillText(dmgNum.text, dmgNum.x, dmgNum.y);
+            ctx.restore();
+        }
+    }
+
     // --- HUD AND METRIC PRINTS ---
     ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(10, 10, 850, 240);
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
 
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
         ctx.fillStyle = '#00ffff'; ctx.fillText(`神经网络链接: VERSUS PILOT ACTIVE`, 30, 60);
-
+        
         if (gameState.isAlienDead) {
             let remainingTime = Math.max(0, Math.ceil((gameState.alienRespawnTimer - Date.now()) / 1000));
             ctx.save();
@@ -562,7 +623,7 @@ function gameLoop() {
                     y: Math.round(en.y),
                     type: parseInt(en.type) || 1,
                     isDying: en.isDying ? true : false,
-                    health: en.health // Make sure the host broadcasts the health tracking state
+                    health: en.health 
                 }))
             });
 
@@ -587,7 +648,7 @@ function gameLoop() {
                 hasScythe: gameState.hasScythe,
                 hasGun: gameState.hasGun
             });
-        } catch (e) { }
+        } catch(e) {}
     }
 
     requestAnimationFrame(gameLoop);
@@ -610,7 +671,11 @@ function spawnTick() {
     if ((gameState.enemyKillScore >= 20 || gameState.pigsSaved >= 10) && c2 < 8) possible.push(2);
     if (gameState.enemyKillScore >= 40 && c3 < 4) possible.push(3);
 
-    if (possible.length > 0) gameState.enemies.push(createEnemy(possible[Math.floor(Math.random() * possible.length)]));
+    if (possible.length > 0) {
+        let spawnedEnemy = createEnemy(possible[Math.floor(Math.random() * possible.length)]);
+        spawnedEnemy.health = 100; // Standard numerical pool
+        gameState.enemies.push(spawnedEnemy);
+    }
 
     window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
 }
@@ -637,7 +702,6 @@ function startGame() {
     gameAudio.play().catch(e => console.log("Audio blocked"));
     initInput(); spawnTick();
     gameState.inventory[0] = 'scythe'; gameState.hasScythe = true;
-    gameState.scythes.push({ x: 1500, y: 1300 });
 
     startTrackingIntervals();
     gameLoop();
@@ -677,7 +741,7 @@ window.addEventListener('keydown', e => {
             if (gameState.isMultiplayer && gameState.peerConnection && gameState.peerConnection.open) {
                 try {
                     gameState.peerConnection.send({ type: 'REMOTE_SOFT_RESET' });
-                } catch (err) {
+                } catch(err) {
                     console.error("PeerJS sync reset frame dropped:", err);
                 }
             }
