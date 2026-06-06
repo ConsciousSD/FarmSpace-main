@@ -11,7 +11,7 @@ setInterval(() => {
     if (!gameState.isPaused && !gameState.isGameOver && !gameState.isMultiplayer) gameState.spawnRateMultiplier *= 0.90;
 }, 60000);
 
-// EXPORTED: Wipes current matching variables in memory without breaking the active PeerJS sockets link!
+// Reset game variables safely in memory without killing the room session connection
 export function resetGameSession() {
     gameState.isGameOver = false;
     gameState.isPaused = false;
@@ -24,19 +24,18 @@ export function resetGameSession() {
     gameState.gunCoolDownActive = false;
     gameState.killsSinceEmpty = 0;
     
-    // Core placement updates
+    // Core placement re-initialization
     gameState.playerX = 500;
     gameState.playerY = 500;
     player.x = 500;
     player.y = 500;
 
-    // Reset items and inventories
     gameState.inventory = ['scythe', null, null, null, null];
     gameState.activeSlot = 0;
     gameState.hasScythe = true;
     gameState.scytheDurability = gameState.maxScytheDurability;
 
-    // Wipe matching arrays clean
+    // Clear tracking fields cleanly
     gameState.enemies = [];
     gameState.plowedPatches = [];
     gameState.plantedWatermelons = [];
@@ -49,7 +48,7 @@ export function resetGameSession() {
     gameState.carryingGrenade = false;
     gameState.guns = [];
 
-    // Respawn the client vessel asset container cleanly if role is alien-master
+    // Respawn the client master drone instance securely if playerRole is alien-master
     if (gameState.playerRole === 'alien-master') {
         let uniqueDroneId = gameState.controlledEnemyId || ("master-drone-" + Math.floor(Math.random() * 99999));
         gameState.controlledEnemyId = uniqueDroneId;
@@ -65,7 +64,6 @@ export function resetGameSession() {
             height: 288
         });
 
-        // Broadcast to Host to append your fresh body node container entity
         if (gameState.peerConnection && gameState.peerConnection.open) {
             gameState.peerConnection.send({
                 type: 'SPAWN_MASTER_VESSEL',
@@ -73,7 +71,7 @@ export function resetGameSession() {
             });
         }
     }
-    console.log("Memory soft-reset completed natively!");
+    console.log(" LOBBY RETAINED: Soft session restart processed cleanly.");
 }
 
 function gameLoop() {
@@ -529,16 +527,17 @@ joinMasterBtn.addEventListener('click', () => {
     }, 1500); 
 });
 
-// FIXED: Handles shared memory session reset execution loops cleanly
+// FIXED: Key listener broadcasts the network signal BEFORE wiping state, preventing synchronization lock timeouts
 window.addEventListener('keydown', e => { 
     if (e.key === 'Enter') startGame(); 
     
     if ((e.key === 'r' || e.key === 'R') && gameState.isGameOver) {
-        console.log("Session reset triggered natively across shared lobby room code!");
+        console.log("Broadcasting authoritative restart event across connection lane...");
         if (gameState.isMultiplayer && gameState.peerConnection && gameState.peerConnection.open) {
-            // Signal to the opponent to soft-reset variables right now
-            gameState.peerConnection.send({ type: 'EXECUTE_SHARED_RESTART' });
+            // Signal the other client first while they're still guaranteed inside the gameover state
+            gameState.peerConnection.send({ type: 'REMOTE_SOFT_RESET' });
         }
+        // Execute local reset safely
         resetGameSession();
     }
 });

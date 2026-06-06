@@ -1,7 +1,7 @@
 import { gameState } from './state.js';
 import { createEnemy, triggerGameOver } from './helpers.js';
 import { shootSound, moveSound } from './audio.js';
-import { resetGameSession } from './main.js'; // Imported session reset wrapper
+import { resetGameSession } from './main.js'; 
 
 export function initMultiplayer(role, roomCode) {
     gameState.isMultiplayer = true;
@@ -66,9 +66,9 @@ function setupConnection(conn) {
                 }
             }
 
-            // Catch remote restart request on host machine
-            if (data.type === 'EXECUTE_SHARED_RESTART') {
-                console.log("Remote client requested session soft-reset.");
+            // FIXED: Authoritative remote listener executes reset immediately upon request
+            if (data.type === 'REMOTE_SOFT_RESET') {
+                console.log("Peer network soft-reset packet verified.");
                 resetGameSession();
             }
         }
@@ -81,9 +81,9 @@ function setupConnection(conn) {
                 if (typeof triggerGameOver === 'function') triggerGameOver();
             }
 
-            // Catch remote restart instruction from host machine
-            if (data.type === 'EXECUTE_SHARED_RESTART') {
-                console.log("Host executed session soft-reset.");
+            // FIXED: Authoritative host listener executes reset immediately upon request
+            if (data.type === 'REMOTE_SOFT_RESET') {
+                console.log("Host soft-reset packet verified.");
                 resetGameSession();
             }
 
