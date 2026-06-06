@@ -63,7 +63,7 @@ export function resetGameSession() {
     gameState.hasGun = false;
     gameState.gunCoolDownActive = false;
     gameState.killsSinceEmpty = 0;
-    
+
     gameState.isAlienDead = false;
     gameState.alienRespawnTimer = 0;
 
@@ -100,7 +100,7 @@ export function resetGameSession() {
     }
 
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    gameLoop(); 
+    gameLoop();
 
     window.focus();
     console.log("LOBBY RETAINED: Soft session restart processed cleanly.");
@@ -206,7 +206,7 @@ function gameLoop() {
         if (localIsMoving) {
             moveSound.play().catch(() => { });
         } else {
-            try { moveSound.pause(); } catch(e) {}
+            try { moveSound.pause(); } catch (e) { }
         }
     }
 
@@ -228,7 +228,7 @@ function gameLoop() {
                         x: Math.round(myDrone.x),
                         y: Math.round(myDrone.y)
                     });
-                } catch(e) {}
+                } catch (e) { }
             }
         }
     }
@@ -237,8 +237,8 @@ function gameLoop() {
     gameState.guns.forEach((g, i) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 160, 160);
         if (checkCollision(player, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
-            gameState.guns.splice(i, 1); 
-            seedPickupSound.play().catch(() => {}); 
+            gameState.guns.splice(i, 1);
+            seedPickupSound.play().catch(() => { });
             gameState.ammo = 100;
             if (!gameState.inventory.includes('gun')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; }
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
@@ -246,27 +246,27 @@ function gameLoop() {
     });
     gameState.seeds.forEach((s, i) => {
         ctx.drawImage(seedSprite, 0, (Math.floor(gameState.gameFrame / 10) % 2) * 288, 288, 288, s.x, s.y, 288, 288);
-        if (checkCollision(player, { x: s.x, y: s.y, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70 }, true)) { 
-            gameState.seedInventory++; 
-            gameState.seeds.splice(i, 1); 
-            seedPickupSound.play().catch(() => {}); 
+        if (checkCollision(player, { x: s.x, y: s.y, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70 }, true)) {
+            gameState.seedInventory++;
+            gameState.seeds.splice(i, 1);
+            seedPickupSound.play().catch(() => { });
         }
     });
     gameState.tires.forEach((t, i) => {
         ctx.drawImage(tireSprite, 0, (Math.floor(gameState.gameFrame / 15) % 2) * 300, 300, 300, t.x, t.y, 300, 300);
-        if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { 
-            gameState.isPowered = true; 
-            gameState.powerTimer = Date.now(); 
-            gameState.tires.splice(i, 1); 
-            tirePickupSound.play().catch(() => {}); 
+        if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) {
+            gameState.isPowered = true;
+            gameState.powerTimer = Date.now();
+            gameState.tires.splice(i, 1);
+            tirePickupSound.play().catch(() => { });
         }
     });
 
     gameState.scythes.forEach((s, i) => {
         ctx.drawImage(scytheSprite, s.x, s.y, 300, 300);
         if (checkCollision(player, { x: s.x, y: s.y, width: 300, height: 300, hitboxOffsetX: 30, hitboxOffsetY: 30 }, true)) {
-            gameState.scythes.splice(i, 1); 
-            seedPickupSound.play().catch(() => {});
+            gameState.scythes.splice(i, 1);
+            seedPickupSound.play().catch(() => { });
             if (!gameState.inventory.includes('scythe')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'scythe'; }
             gameState.scytheDurability = gameState.maxScytheDurability;
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
@@ -275,12 +275,12 @@ function gameLoop() {
 
     if (gameState.hasGun && gameState.isShooting) {
         gameState.ammo -= 0.15;
-        if (gameState.ammo <= 0) { 
-            gameState.hasGun = false; 
-            gameState.isShooting = false; 
-            gameState.gunCoolDownActive = true; 
-            gameState.killsSinceEmpty = 0; 
-            try { shootSound.pause(); } catch(e) {}
+        if (gameState.ammo <= 0) {
+            gameState.hasGun = false;
+            gameState.isShooting = false;
+            gameState.gunCoolDownActive = true;
+            gameState.killsSinceEmpty = 0;
+            try { shootSound.pause(); } catch (e) { }
         }
     }
     if (gameState.gunCoolDownActive && gameState.killsSinceEmpty >= 10) { gameState.gunCoolDownActive = false; gameState.killsSinceEmpty = 0; }
@@ -312,7 +312,7 @@ function gameLoop() {
 
             if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
                 if (en.targetX !== undefined && !isPlayerControlledDrone) {
-                    en.x += (en.targetX - en.x) * 0.18; 
+                    en.x += (en.targetX - en.x) * 0.18;
                     en.y += (en.targetY - en.y) * 0.18;
                 }
             } else {
@@ -326,7 +326,7 @@ function gameLoop() {
                 if (Math.hypot((en.x + 144) - s.x, (en.y + 144) - s.y) < 150) {
                     gameState.seeds.splice(sIdx, 1);
                     if (gameState.isMultiplayer && gameState.peerConnection) {
-                        try { gameState.peerConnection.send({ type: 'SEED_STOLEN' }); } catch(e) {}
+                        try { gameState.peerConnection.send({ type: 'SEED_STOLEN' }); } catch (e) { }
                     }
                 }
             });
@@ -336,17 +336,22 @@ function gameLoop() {
                 en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : (en.type === 1 ? 3 : 2));
                 en.fT = 0;
             }
-
             let enemyImage;
             if (en.type === 2) enemyImage = enemySprite2;
             else if (en.type === 3) enemyImage = enemySprite3;
             else enemyImage = enemySprite;
 
+            // Track target height for proper UI placement above the sprite head
+            let currentSpriteHeight = 288;
+
             if (en.type === 2) {
+                currentSpriteHeight = 432;
                 ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
             } else if (en.type === 3) {
+                currentSpriteHeight = 400;
                 ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
             } else {
+                currentSpriteHeight = 288;
                 let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : (Math.floor(gameState.gameFrame / 10) % 3);
                 let spriteCol = trueFrame % 2;
                 let spriteRow = Math.floor(trueFrame / 2);
@@ -360,17 +365,54 @@ function gameLoop() {
                 );
             }
 
+            // --- FIXED: UNIVERSAL ALIEN PLAYER HEALTH BAR OVERLAY ---
+            if (gameState.isMultiplayer && en.id === gameState.controlledEnemyId) {
+                let maxAlienHP = 5;
+                let currentHP = en.health !== undefined ? en.health : maxAlienHP;
+
+                let barWidth = 140;
+                let barHeight = 12;
+
+                // Align bar horizontally based on sprite width context types
+                let spriteRenderWidth = (en.type === 3) ? 300 : 288;
+                let barX = en.x + (spriteRenderWidth / 2) - (barWidth / 2);
+
+                // Dynamically offset the Y position using our assigned asset tracking heights
+                let barY = en.y - 20;
+
+                // 1. Draw the background track wrapper frame
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+
+                // 2. Compute fill percentage metrics securely
+                let hpPercentage = Math.max(0, Math.min(1, currentHP / maxAlienHP));
+
+                // 3. Dynamic color shifting (Cyan when healthy, warning red when low)
+                if (hpPercentage > 0.4) {
+                    ctx.fillStyle = '#00ffff';
+                } else {
+                    ctx.fillStyle = '#ff3333';
+                }
+
+                // 4. Fill the bar
+                ctx.fillRect(barX + 2, barY + 2, (barWidth - 4) * hpPercentage, barHeight - 4);
+
+                // 5. Apply a crisp geometric border line
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(barX, barY, barWidth, barHeight);
+            }
             // FIXED: AK47 Gun Damage Fire-Rate Throttling (Applies health deduction every 15 frames instead of every frame)
             if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
                 let pDx = en.x - gameState.playerX;
                 if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0)) && gameState.gameFrame % 15 === 0) {
                     en.health = (en.health !== undefined) ? en.health - 1 : 4; // Safely handle base values
-                    
-                    if (en.health <= 0) { 
-                        en.isDying = true; 
-                        en.deathFrame = 0; 
-                        en.deathTimer = 0; 
-                        gameState.enemyKillScore++; 
+
+                    if (en.health <= 0) {
+                        en.isDying = true;
+                        en.deathFrame = 0;
+                        en.deathTimer = 0;
+                        gameState.enemyKillScore++;
                     }
                 }
             }
@@ -381,10 +423,10 @@ function gameLoop() {
                     en.health = 0; en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++;
                 } else {
                     if (gameState.isMultiplayer && gameState.peerConnection) {
-                        try { gameState.peerConnection.send({ type: 'GAME_OVER_TRIGGER' }); } catch(e) {}
+                        try { gameState.peerConnection.send({ type: 'GAME_OVER_TRIGGER' }); } catch (e) { }
                     }
                     triggerGameOver();
-                    window.focus(); 
+                    window.focus();
                 }
             }
         }
@@ -421,13 +463,13 @@ function gameLoop() {
     });
 
     if (gameState.carryingPig && checkCollision(player, gameState.corral)) {
-        gameState.pigs.splice(gameState.pigs.indexOf(gameState.carryingPig), 1); gameState.carryingPig = null; gameState.pigsSaved++; 
-        watermelonPickupSound.play().catch(() => {});
+        gameState.pigs.splice(gameState.pigs.indexOf(gameState.carryingPig), 1); gameState.carryingPig = null; gameState.pigsSaved++;
+        watermelonPickupSound.play().catch(() => { });
         gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
     }
     if (gameState.carryingChicken && checkCollision(player, gameState.corral)) {
-        gameState.chickens.splice(gameState.chickens.indexOf(gameState.carryingChicken), 1); gameState.carryingChicken = null; gameState.chickensSaved++; 
-        watermelonPickupSound.play().catch(() => {});
+        gameState.chickens.splice(gameState.chickens.indexOf(gameState.carryingChicken), 1); gameState.carryingChicken = null; gameState.chickensSaved++;
+        watermelonPickupSound.play().catch(() => { });
         gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
     }
 
@@ -435,8 +477,8 @@ function gameLoop() {
         let bobbing = Math.sin(gameState.gameFrame * 0.08) * 12;
         ctx.drawImage(charmSprite, charm.x, charm.y + bobbing, charm.width, charm.height);
         if (checkCollision(player, { x: charm.x, y: charm.y, width: charm.width, height: charm.height }, true)) {
-            gameState.charms.splice(i, 1); 
-            seedPickupSound.play().catch(() => {}); 
+            gameState.charms.splice(i, 1);
+            seedPickupSound.play().catch(() => { });
             gameState.enemyKillScore += 5;
         }
     });
@@ -447,8 +489,8 @@ function gameLoop() {
         let wmCols = 3, wmSize = 288;
         ctx.drawImage(watermelonSprite, (wm.fIdx % wmCols) * wmSize, Math.floor(wm.fIdx / wmCols) * wmSize, wmSize, wmSize, wm.x, wm.y, 288, 288);
         if (wm.done && checkCollision(player, wm) && gameState.playerRole === 'farmer') {
-            gameState.plantedWatermelons.splice(i, 1); 
-            watermelonPickupSound.play().catch(() => {});
+            gameState.plantedWatermelons.splice(i, 1);
+            watermelonPickupSound.play().catch(() => { });
             let target = gameState.enemies.find(e => !e.isDying);
             if (target) { target.isDying = true; target.deathFrame = 0; target.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++; }
         }
@@ -457,14 +499,14 @@ function gameLoop() {
     gameState.activeGrenades.forEach((g, i) => {
         if (!g.exploded) {
             g.x += g.vX; g.y += g.vY; g.vY += 0.6; g.timer--;
-            ctx.save(); 
-            ctx.translate(g.x, g.y); 
-            ctx.rotate(gameState.gameFrame * 0.3); 
-            ctx.drawImage(grenadeSprite, -80, -80, 160, 160); 
+            ctx.save();
+            ctx.translate(g.x, g.y);
+            ctx.rotate(gameState.gameFrame * 0.3);
+            ctx.drawImage(grenadeSprite, -80, -80, 160, 160);
             ctx.restore();
             if (g.timer <= 0 && gameState.playerRole === 'farmer') {
-                g.exploded = true; 
-                grenadeExplosionSound.play().catch(() => {});
+                g.exploded = true;
+                grenadeExplosionSound.play().catch(() => { });
                 gameState.enemies.forEach(en => { if (Math.hypot(en.x - g.x, en.y - g.y) < 450) { en.health = 0; en.isDying = true; en.deathFrame = 0; gameState.enemyKillScore++; } });
             }
         } else {
@@ -481,7 +523,7 @@ function gameLoop() {
 
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
         ctx.fillStyle = '#00ffff'; ctx.fillText(`神经网络链接: VERSUS PILOT ACTIVE`, 30, 60);
-        
+
         if (gameState.isAlienDead) {
             let remainingTime = Math.max(0, Math.ceil((gameState.alienRespawnTimer - Date.now()) / 1000));
             ctx.save();
@@ -552,7 +594,7 @@ function gameLoop() {
                 hasScythe: gameState.hasScythe,
                 hasGun: gameState.hasGun
             });
-        } catch(e) {}
+        } catch (e) { }
     }
 
     requestAnimationFrame(gameLoop);
@@ -642,7 +684,7 @@ window.addEventListener('keydown', e => {
             if (gameState.isMultiplayer && gameState.peerConnection && gameState.peerConnection.open) {
                 try {
                     gameState.peerConnection.send({ type: 'REMOTE_SOFT_RESET' });
-                } catch(err) {
+                } catch (err) {
                     console.error("PeerJS sync reset frame dropped:", err);
                 }
             }
