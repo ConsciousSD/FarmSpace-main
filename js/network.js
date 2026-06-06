@@ -38,7 +38,7 @@ function setupConnection(conn) {
                     masterAlien.id = data.id;
                     masterAlien.x = 1250; 
                     masterAlien.y = 1250;
-                    masterAlien.isLocallyControlled = true; // Stops her AI scripts from overriding your inputs
+                    masterAlien.isLocallyControlled = true; 
                     gameState.enemies.push(masterAlien);
                 }
             }
@@ -56,7 +56,9 @@ function setupConnection(conn) {
         // --- 🛸 ALIEN MASTER CLIENT SIDE (YOU) ---
         if (gameState.playerRole === 'alien-master') {
             if (data.type === 'SYNC_ENEMIES') {
-                // Reconstruct the synced array objects so your local machine can handle animations independently
+                // FIXED: Protect your player-controlled alien structure
+                let activeDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
+                
                 data.enemies.forEach(ne => {
                     let localEn = gameState.enemies.find(e => e.id === ne.id);
                     if (!localEn) {
@@ -74,14 +76,15 @@ function setupConnection(conn) {
                         };
                         gameState.enemies.push(localEn);
                     } else {
-                        // Smoothly update positions instead of overwriting the whole object frame clock
+                        // FIXED: Smooth updates! Only map location markers across the link.
+                        // We do NOT overwrite fIdx or fT here so your local animation cycle walks smoothly!
                         localEn.x = ne.x;
                         localEn.y = ne.y;
                         localEn.isDying = ne.isDying;
                     }
                 });
 
-                // Clean up dead enemies that are no longer in her list
+                // Filter out destroyed targets dynamically
                 gameState.enemies = gameState.enemies.filter(le => data.enemies.some(ne => ne.id === le.id) || le.id === gameState.controlledEnemyId);
             }
             if (data.type === 'SYNC_FARMER') {
@@ -101,7 +104,6 @@ function setupConnection(conn) {
                 gameState.inventory = data.inventory;
                 gameState.hasScythe = data.hasScythe;
                 
-                // AUDIO SYNCHRONIZER: Triggers your local sound system based on her network actions
                 if (data.isShooting) {
                     gameState.isShooting = true;
                     if (shootSound.paused) shootSound.play().catch(() => {});

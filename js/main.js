@@ -103,7 +103,6 @@ function gameLoop() {
     gameState.playerX = Math.max(0, Math.min(CANVAS_WIDTH - 288, gameState.playerX));
     gameState.playerY = Math.max(0, Math.min(CANVAS_HEIGHT - 288, gameState.playerY));
     
-    // Check local vs remote movement variables
     let localIsMoving = (gameState.moveLeft || gameState.moveRight || gameState.moveUp || gameState.moveDown);
     if (gameState.playerRole === 'farmer') {
         if (localIsMoving) moveSound.play().catch(()=>{}); else moveSound.pause();
@@ -160,13 +159,21 @@ function gameLoop() {
             let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
             let moveDir = (gameState.isPowered || (gameState.hasGun && gameState.isShooting)) ? -1 : 1;
             
-            // AI moves standard units, keyboard moves your unit
             if (!en.isLocallyControlled && gameState.playerRole === 'farmer') {
                 en.x += (dx / dist) * en.speed * moveDir; 
                 en.y += (dy / dist) * en.speed * moveDir;
             }
 
-            // FIXED ANIMATION CLOCK: Both clients compute frame ticks locally so motion stays silky smooth
+            gameState.seeds.forEach((s, sIdx) => {
+                if (Math.hypot((en.x + 144) - s.x, (en.y + 144) - s.y) < 150) {
+                    gameState.seeds.splice(sIdx, 1);
+                    if (gameState.isMultiplayer && gameState.peerConnection) {
+                        gameState.peerConnection.send({ type: 'SEED_STOLEN' });
+                    }
+                }
+            });
+
+            // SILKY SMOOTH LOCAL TICK: Frames run natively on both computers independently
             en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
             
             let enemyImage;
@@ -178,9 +185,7 @@ function gameLoop() {
             else if (en.type === 3) ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
             else ctx.drawImage(enemyImage, en.fIdx * 288, 0, 288, 288, en.x, en.y, 288, 288);
 
-            if (gameState.isMultiplayer && gameState.controlledEnemyId === en.id) {
-                ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(en.x + 144, en.y + 144, 150, 0, Math.PI * 2); ctx.stroke();
-            }
+            // FIXED: Deleted the flashing cyan stroke target circle from drawing here!
 
             if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
                 let pDx = en.x - gameState.playerX;
@@ -306,7 +311,6 @@ function gameLoop() {
             }))
         });
 
-        // Pack audio toggle flags into the package data payload directly
         gameState.peerConnection.send({
             type: 'SYNC_FARMER',
             playerX: Math.round(gameState.playerX),
@@ -391,7 +395,6 @@ joinMasterBtn.addEventListener('click', () => {
     let uniqueDroneId = "master-drone-" + Math.floor(Math.random() * 99999);
     gameState.controlledEnemyId = uniqueDroneId;
 
-    // Initialize your driver entity right on your grid so it draws fluidly
     gameState.enemies.push({
         id: uniqueDroneId,
         type: 1,
