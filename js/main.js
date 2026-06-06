@@ -172,11 +172,13 @@ function gameLoop() {
 
             en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
             
-            // HARD FIXED: Re-mapped directly to loaded HTML Image nodes based entirely on numerical network state type flags
-            let enemyImage;
-            if (en.type === 2) enemyImage = enemyDeathSprite2; 
-            else if (en.type === 3) enemyImage = chickenSprite; 
-            else enemyImage = enemyDeathSprite; // Safely draws the native sprite sheet variable on both computers
+            // FIXED: If en.img drops over network serialization packets, point it directly to our cached graphics!
+            let enemyImage = en.img; 
+            if (!enemyImage) {
+                if (en.type === 2) enemyImage = enemyDeathSprite2; 
+                else if (en.type === 3) enemyImage = chickenSprite; 
+                else enemyImage = enemyDeathSprite; // Fixed fallback sheet pointer layout
+            }
 
             if (en.type === 2) ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
             else if (en.type === 3) ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
@@ -305,10 +307,9 @@ function gameLoop() {
     }
 
     if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.gameFrame % 3 === 0) {
-        // Only map flattened strings over the PeerJS payload pipeline to avoid image loading serialization drops
         gameState.peerConnection.send({
             type: 'SYNC_ENEMIES',
-            enemies: gameState.enemies.map(en => ({ id: en.id, x: en.x, y: en.y, type: en.type, fIdx: en.fIdx, isDying: en.isDying, deathFrame: en.deathFrame, deathTimer: en.deathTimer }))
+            enemies: gameState.enemies.map(en => ({ id: en.id, x: en.x, y: en.y, type: en.type, fIdx: en.fIdx, isDying: en.isDying }))
         });
 
         gameState.peerConnection.send({
@@ -390,24 +391,20 @@ joinMasterBtn.addEventListener('click', () => {
     initInput();
     gameLoop();
 
-    let starterId = "master-drone-" + Math.floor(Math.random() * 99999);
-    
-    gameState.enemies.push({
-        id: starterId,
-        type: 1, 
-        x: 1250, 
-        y: 1250,
-        speed: 4,
-        health: 5,
-        fIdx: 0,
-        fT: 0,
-        width: 288,
-        height: 288,
-        isLocallyControlled: true 
-    });
+    // FIXED: Instead of faking a local drone, we blast a network packet to her machine
+    // telling her engine to drop an AUTHORITATIVE alien on her map grid center instantly!
+    let uniqueDroneId = "master-drone-" + Math.floor(Math.random() * 99999);
+    gameState.controlledEnemyId = uniqueDroneId;
 
-    gameState.controlledEnemyId = starterId;
-    console.log("Client-authoritative drone instance live!");
+    setTimeout(() => {
+        if (gameState.peerConnection && gameState.peerConnection.open) {
+            gameState.peerConnection.send({
+                type: 'SPAWN_MASTER_VESSEL',
+                id: uniqueDroneId
+            });
+            console.log("Blasted authoritative alien request to Host!");
+        }
+    }, 1500); 
 });
 
 window.addEventListener('keydown', e => { if (e.key === 'Enter') startGame(); });

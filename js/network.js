@@ -30,51 +30,46 @@ function setupConnection(conn) {
 
         // --- 👩‍🌾 SURVIVOR / HOST SIDE (YOUR WIFE) ---
         if (gameState.playerRole === 'farmer') {
+            // Master requested a real native alien entity built directly on the server host layout
+            if (data.type === 'SPAWN_MASTER_VESSEL') {
+                console.log(`Spawning real basic scout for Player 2 with ID: ${data.id}`);
+                
+                // CRITICAL: Uses her native factory function to construct a real asset wrapper
+                const masterAlien = createEnemy(1); 
+                if (masterAlien) {
+                    masterAlien.id = data.id;
+                    masterAlien.x = 1250; // Perfect map center positioning
+                    masterAlien.y = 1250;
+                    masterAlien.isLocallyControlled = true; // Halts her built-in AI pathfinding scripts
+                    
+                    gameState.enemies.push(masterAlien);
+                }
+            }
+
             if (data.type === 'CONTROL_MOVE') {
                 let targetedAlien = gameState.enemies.find(e => e.id === data.id);
-                
-                // If your master alien isn't on her map yet, her machine builds it instantly
-                if (!targetedAlien) {
-                    targetedAlien = createEnemy(1); // Real live basic scout asset configuration
-                    targetedAlien.id = data.id;
-                    gameState.enemies.push(targetedAlien);
+                if (targetedAlien) {
+                    targetedAlien.x = data.x;
+                    targetedAlien.y = data.y;
+                    targetedAlien.isLocallyControlled = true; 
                 }
-                
-                // Update your position on her screen frame loop
-                targetedAlien.x = data.x;
-                targetedAlien.y = data.y;
-                targetedAlien.isLocallyControlled = true; // Prevents her AI scripts from overriding you
             }
         }
         
         // --- 🛸 ALIEN MASTER CLIENT SIDE (YOU) ---
         if (gameState.playerRole === 'alien-master') {
             if (data.type === 'SYNC_ENEMIES') {
-                // Keep your player-controlled alien safe from getting wiped out by her empty single-player enemy array!
+                // Keep your active avatar entity array safe from being cleared by network latency packets
                 let activeDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
                 
-                // Read any background assets she has going on
-                gameState.enemies = data.enemies.map(networkEnemy => {
-                    return {
-                        id: networkEnemy.id,
-                        type: networkEnemy.type,
-                        x: networkEnemy.x,
-                        y: networkEnemy.y,
-                        fIdx: networkEnemy.fIdx,
-                        fT: 0,
-                        isDying: networkEnemy.isDying,
-                        width: 288,
-                        height: 288
-                    };
-                });
+                // Safely mirror all host-constructed entities down to your layout canvas screen
+                gameState.enemies = data.enemies;
                 
-                // Force-reinsert your playable vessel if her network packet left it out
                 if (activeDrone && !gameState.enemies.some(e => e.id === gameState.controlledEnemyId)) {
                     gameState.enemies.push(activeDrone);
                 }
             }
             if (data.type === 'SYNC_FARMER') {
-                // Mirror her exact player movements onto your master monitor viewport canvas
                 gameState.playerX = data.playerX;
                 gameState.playerY = data.playerY;
                 gameState.plowedPatches = data.plowedPatches;
