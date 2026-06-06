@@ -23,7 +23,6 @@ function dispatchMasterVesselSpawn() {
     gameState.isAlienDead = false;
     gameState.alienRespawnTimer = 0;
 
-    // Push local reference structural placeholder
     gameState.enemies.push({
         id: uniqueDroneId,
         type: 1,
@@ -32,7 +31,8 @@ function dispatchMasterVesselSpawn() {
         fIdx: 0,
         fT: 0,
         width: 288,
-        height: 288
+        height: 288,
+        health: 5 // Initial baseline health assignment
     });
 
     if (gameState.peerConnection && gameState.peerConnection.open) {
@@ -64,7 +64,6 @@ export function resetGameSession() {
     gameState.gunCoolDownActive = false;
     gameState.killsSinceEmpty = 0;
     
-    // Reset client side respawn trackers
     gameState.isAlienDead = false;
     gameState.alienRespawnTimer = 0;
 
@@ -213,7 +212,6 @@ function gameLoop() {
 
     // --- ALIEN MASTER CONTROLLER TRACKING INTERCEPT ---
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && gameState.peerConnection && gameState.peerConnection.open) {
-        // Only allow positional changes if the player is currently alive
         if (!gameState.isAlienDead) {
             let myDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
             if (myDrone) {
@@ -300,10 +298,9 @@ function gameLoop() {
                 if (en.type === 2) { deathImg = enemyDeathSprite2; sW = 128; sH = 128; dH = 432; } else { deathImg = enemyDeathSprite; sW = 64; sH = 64; dH = 288; }
                 ctx.drawImage(deathImg, col * sW, row * sH, sW, sH, en.x, en.y, 288, dH);
             } else {
-                // If the client's master drone just finished its death animation path, trigger the 10s cooldown
                 if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && en.id === gameState.controlledEnemyId) {
                     gameState.isAlienDead = true;
-                    gameState.alienRespawnTimer = Date.now() + 10000; // Block access for exactly 10 seconds
+                    gameState.alienRespawnTimer = Date.now() + 10000;
                 }
                 gameState.enemies.splice(i, 1);
             }
@@ -363,10 +360,18 @@ function gameLoop() {
                 );
             }
 
+            // FIXED: AK47 Gun Damage Fire-Rate Throttling (Applies health deduction every 15 frames instead of every frame)
             if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
                 let pDx = en.x - gameState.playerX;
                 if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0)) && gameState.gameFrame % 15 === 0) {
-                    en.health--; if (en.health <= 0) { en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; }
+                    en.health = (en.health !== undefined) ? en.health - 1 : 4; // Safely handle base values
+                    
+                    if (en.health <= 0) { 
+                        en.isDying = true; 
+                        en.deathFrame = 0; 
+                        en.deathTimer = 0; 
+                        gameState.enemyKillScore++; 
+                    }
                 }
             }
 
@@ -477,7 +482,6 @@ function gameLoop() {
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
         ctx.fillStyle = '#00ffff'; ctx.fillText(`神经网络链接: VERSUS PILOT ACTIVE`, 30, 60);
         
-        // --- FIXED ALIEN RESPAWN HUD OVERLAY ---
         if (gameState.isAlienDead) {
             let remainingTime = Math.max(0, Math.ceil((gameState.alienRespawnTimer - Date.now()) / 1000));
             ctx.save();
@@ -492,7 +496,6 @@ function gameLoop() {
             ctx.fillText(`RESPAWNING IN: ${remainingTime}s`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 50);
             ctx.restore();
 
-            // Self execute respawn call when clock hits threshold bounds
             if (Date.now() >= gameState.alienRespawnTimer) {
                 dispatchMasterVesselSpawn();
             }
@@ -523,7 +526,8 @@ function gameLoop() {
                     x: Math.round(en.x),
                     y: Math.round(en.y),
                     type: parseInt(en.type) || 1,
-                    isDying: en.isDying ? true : false
+                    isDying: en.isDying ? true : false,
+                    health: en.health // Make sure the host broadcasts the health tracking state
                 }))
             });
 
