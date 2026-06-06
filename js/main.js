@@ -108,6 +108,27 @@ function gameLoop() {
         if (localIsMoving) moveSound.play().catch(()=>{}); else moveSound.pause();
     }
 
+    // --- ALIEN MASTER POSITION OUTBOUND BROADCAST ---
+    if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && gameState.peerConnection && gameState.peerConnection.open) {
+        let myDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
+        if (myDrone) {
+            // Read your laptop's manual arrow tracking controls
+            if (gameState.moveLeft) myDrone.x -= 7;  if (gameState.moveRight) myDrone.x += 7;
+            if (gameState.moveUp) myDrone.y -= 7;    if (gameState.moveDown) myDrone.y += 7;
+            
+            myDrone.x = Math.max(0, Math.min(CANVAS_WIDTH - 288, myDrone.x));
+            myDrone.y = Math.max(0, Math.min(CANVAS_HEIGHT - 288, myDrone.y));
+
+            // FIXED: Blasts your updated location back to the host screen instantly!
+            gameState.peerConnection.send({
+                type: 'CONTROL_MOVE',
+                id: gameState.controlledEnemyId,
+                x: Math.round(myDrone.x),
+                y: Math.round(myDrone.y)
+            });
+        }
+    }
+
     // Weapon ground collisions
     gameState.guns.forEach((g, i) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 600, 600);
@@ -159,7 +180,6 @@ function gameLoop() {
             let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
             let moveDir = (gameState.isPowered || (gameState.hasGun && gameState.isShooting)) ? -1 : 1;
             
-            // Player versus match AI possession check
             let isPlayerControlledDrone = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
             
             if (!isPlayerControlledDrone && !en.isLocallyControlled && gameState.playerRole === 'farmer') {
@@ -176,18 +196,18 @@ function gameLoop() {
                 }
             });
 
-            // Local animation frames clock steps cleanly
+            // Local animation clock loop steps safely
             en.fT++; 
             if (en.fT >= 10) { 
+                // Type 1 basic scout limits safely at modulo 3 to avoid blank 4th cell quadrant space
                 en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : (en.type === 1 ? 3 : 2)); 
                 en.fT = 0; 
             }
             
-            // FIXED: Pointed base units (Type 1) directly to enemySprite walking sheet (Poltra.png)
             let enemyImage;
             if (en.type === 2) enemyImage = enemySprite2; 
             else if (en.type === 3) enemyImage = enemySprite3; 
-            else enemyImage = enemySprite; // <--- ROUTING LOGIC HARD-FIXED TO POINT TO YOUR WALKING SHEET!
+            else enemyImage = enemySprite; 
 
             // Type 2: Boss Fat Alien
             if (en.type === 2) {
@@ -197,19 +217,19 @@ function gameLoop() {
             else if (en.type === 3) {
                 ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
             } 
-            // Type 1: Basic Scout Alien (Slices poltra.png 576x576 in a perfect 2x2 grid segment!)
+            // Type 1: Basic Scout Alien (Slices poltra.png 576x576 into 2x2 grid frames)
             else {
-                let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : (Math.floor(gameState.gameFrame / 10) % 4);
+                let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : (Math.floor(gameState.gameFrame / 10) % 3);
 
                 let spriteCol = trueFrame % 2;          
                 let spriteRow = Math.floor(trueFrame / 2); 
 
                 ctx.drawImage(
                     enemyImage, 
-                    spriteCol * 288, spriteRow * 288, // Source X crop location, Source Y crop location
-                    288, 288,                         // Source Width, Source Height (Single square slice window cell)
-                    en.x, en.y,                       // Canvas positioning grid target vectors
-                    288, 288                          // Render size bounding dimensions
+                    spriteCol * 288, spriteRow * 288, 
+                    288, 288,                         
+                    en.x, en.y,                       
+                    288, 288                          
                 );
             }
 
