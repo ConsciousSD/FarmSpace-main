@@ -102,8 +102,12 @@ function gameLoop() {
     if (gameState.moveUp) gameState.playerY -= speed; if (gameState.moveDown) gameState.playerY += speed;
     gameState.playerX = Math.max(0, Math.min(CANVAS_WIDTH - 288, gameState.playerX));
     gameState.playerY = Math.max(0, Math.min(CANVAS_HEIGHT - 288, gameState.playerY));
-    gameState.isMoving = (gameState.moveLeft || gameState.moveRight || gameState.moveUp || gameState.moveDown);
-    if (gameState.isMoving && !(gameState.isMultiplayer && gameState.playerRole === 'alien-master')) moveSound.play(); else moveSound.pause();
+    
+    // Check local vs remote movement variables
+    let localIsMoving = (gameState.moveLeft || gameState.moveRight || gameState.moveUp || gameState.moveDown);
+    if (gameState.playerRole === 'farmer') {
+        if (localIsMoving) moveSound.play().catch(()=>{}); else moveSound.pause();
+    }
 
     // Weapon ground collisions
     gameState.guns.forEach((g, i) => {
@@ -156,23 +160,15 @@ function gameLoop() {
             let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
             let moveDir = (gameState.isPowered || (gameState.hasGun && gameState.isShooting)) ? -1 : 1;
             
-            if (!en.isLocallyControlled) {
+            // AI moves standard units, keyboard moves your unit
+            if (!en.isLocallyControlled && gameState.playerRole === 'farmer') {
                 en.x += (dx / dist) * en.speed * moveDir; 
                 en.y += (dy / dist) * en.speed * moveDir;
             }
 
-            gameState.seeds.forEach((s, sIdx) => {
-                if (Math.hypot((en.x + 144) - s.x, (en.y + 144) - s.y) < 150) {
-                    gameState.seeds.splice(sIdx, 1);
-                    if (gameState.isMultiplayer && gameState.peerConnection) {
-                        gameState.peerConnection.send({ type: 'SEED_STOLEN' });
-                    }
-                }
-            });
-
+            // FIXED ANIMATION CLOCK: Both clients compute frame ticks locally so motion stays silky smooth
             en.fT++; if (en.fT >= 10) { en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : 2); en.fT = 0; }
             
-            // FIXED FALLBACK CODES: Completely detached from complex variable objects
             let enemyImage;
             if (en.type === 2) enemyImage = enemyDeathSprite2; 
             else if (en.type === 3) enemyImage = chickenSprite; 
@@ -192,7 +188,7 @@ function gameLoop() {
                     en.health--; if (en.health <= 0) { en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; }
                 }
             }
-            if (checkCollision(player, en) && !(gameState.isMultiplayer && gameState.playerRole === 'alien-master')) {
+            if (checkCollision(player, en) && gameState.playerRole === 'farmer') {
                 if (gameState.isPowered) { en.health = 0; en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++; }
                 else triggerGameOver();
             }
@@ -230,9 +226,6 @@ function gameLoop() {
         ctx.restore();
     });
 
-    let now = Date.now();
-    if (anyAnimalWalking && (now - gameState.lastPigSoundTime > 15000)) { pigWalkSound.currentTime = 0; pigWalkSound.play(); gameState.lastPigSoundTime = now; }
-
     if (gameState.carryingPig && checkCollision(player, gameState.corral)) {
         gameState.pigs.splice(gameState.pigs.indexOf(gameState.carryingPig), 1); gameState.carryingPig = null; gameState.pigsSaved++; watermelonPickupSound.play();
         gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
@@ -255,7 +248,7 @@ function gameLoop() {
         if (!wm.done) { wm.fT++; if (wm.fT > 50) { wm.fIdx++; wm.fT = 0; if (wm.fIdx >= 8) wm.done = true; } }
         let wmCols = 3, wmSize = 288;
         ctx.drawImage(watermelonSprite, (wm.fIdx % wmCols) * wmSize, Math.floor(wm.fIdx / wmCols) * wmSize, wmSize, wmSize, wm.x, wm.y, 288, 288);
-        if (wm.done && checkCollision(player, wm)) {
+        if (wm.done && checkCollision(player, wm) && gameState.playerRole === 'farmer') {
             gameState.plantedWatermelons.splice(i, 1); watermelonPickupSound.play();
             let target = gameState.enemies.find(e => !e.isDying);
             if (target) { target.isDying = true; target.deathFrame = 0; target.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++; }
@@ -266,7 +259,7 @@ function gameLoop() {
         if (!g.exploded) {
             g.x += g.vX; g.y += g.vY; g.vY += 0.6; g.timer--;
             ctx.save(); ctx.translate(g.vX, g.y); ctx.rotate(gameState.gameFrame * 0.3); ctx.drawImage(grenadeSprite, -80, -80, 160, 160); ctx.restore();
-            if (g.timer <= 0) {
+            if (g.timer <= 0 && gameState.playerRole === 'farmer') {
                 g.exploded = true; grenadeExplosionSound.play();
                 gameState.enemies.forEach(en => { if (Math.hypot(en.x - g.x, en.y - g.y) < 450) { en.health = 0; en.isDying = true; en.deathFrame = 0; gameState.enemyKillScore++; } });
             }
@@ -300,12 +293,8 @@ function gameLoop() {
         let durPct = gameState.scytheDurability / gameState.maxScytheDurability;
         ctx.fillStyle = durPct > 0.35 ? '#00bfff' : '#FFaa00'; ctx.fillRect(210, 185, 200 * durPct, 30);
     }
-    if (gameState.isPowered) {
-        ctx.fillStyle = 'yellow'; let rem = Math.max(0, Math.ceil((10000 - (now - gameState.powerTimer)) / 1000)); ctx.fillText(`TRACTOR: ${rem}s`, 350, 60);
-    }
 
     if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.gameFrame % 3 === 0) {
-        // FIXED PAYLOAD COMPRESSION: Stripped complex sub-properties (like en.img) so binarypack doesn't trip!
         gameState.peerConnection.send({
             type: 'SYNC_ENEMIES',
             enemies: gameState.enemies.map(en => ({ 
@@ -313,15 +302,17 @@ function gameLoop() {
                 x: Math.round(en.x), 
                 y: Math.round(en.y), 
                 type: parseInt(en.type) || 1, 
-                fIdx: parseInt(en.fIdx) || 0, 
                 isDying: en.isDying ? true : false 
             }))
         });
 
+        // Pack audio toggle flags into the package data payload directly
         gameState.peerConnection.send({
             type: 'SYNC_FARMER',
             playerX: Math.round(gameState.playerX),
             playerY: Math.round(gameState.playerY),
+            isShooting: gameState.isShooting,
+            isMoving: localIsMoving,
             plowedPatches: gameState.plowedPatches.map(p => ({ x: p.x, y: p.y, size: p.size })),
             plantedWatermelons: gameState.plantedWatermelons.map(w => ({ x: w.x, y: w.y, fIdx: w.fIdx, done: w.done })),
             seeds: gameState.seeds.map(s => ({ x: s.x, y: s.y })),
@@ -399,6 +390,18 @@ joinMasterBtn.addEventListener('click', () => {
 
     let uniqueDroneId = "master-drone-" + Math.floor(Math.random() * 99999);
     gameState.controlledEnemyId = uniqueDroneId;
+
+    // Initialize your driver entity right on your grid so it draws fluidly
+    gameState.enemies.push({
+        id: uniqueDroneId,
+        type: 1,
+        x: 1250,
+        y: 1250,
+        fIdx: 0,
+        fT: 0,
+        width: 288,
+        height: 288
+    });
 
     setTimeout(() => {
         if (gameState.peerConnection && gameState.peerConnection.open) {

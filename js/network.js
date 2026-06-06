@@ -1,5 +1,6 @@
 import { gameState } from './state.js';
 import { createEnemy } from './helpers.js';
+import { shootSound, moveSound } from './audio.js';
 
 export function initMultiplayer(role, roomCode) {
     gameState.isMultiplayer = true;
@@ -31,14 +32,13 @@ function setupConnection(conn) {
         // --- 👩‍🌾 SURVIVOR / HOST SIDE (YOUR WIFE) ---
         if (gameState.playerRole === 'farmer') {
             if (data.type === 'SPAWN_MASTER_VESSEL') {
-                console.log(`Spawning real basic scout for Player 2 with ID: ${data.id}`);
-                
+                console.log(`Spawning host-authoritative puppet drone for Player 2: ${data.id}`);
                 const masterAlien = createEnemy(1); 
                 if (masterAlien) {
                     masterAlien.id = data.id;
                     masterAlien.x = 1250; 
                     masterAlien.y = 1250;
-                    masterAlien.isLocallyControlled = true; 
+                    masterAlien.isLocallyControlled = true; // Stops her AI scripts from overriding your inputs
                     gameState.enemies.push(masterAlien);
                 }
             }
@@ -46,7 +46,6 @@ function setupConnection(conn) {
             if (data.type === 'CONTROL_MOVE') {
                 let targetedAlien = gameState.enemies.find(e => e.id === data.id);
                 if (targetedAlien) {
-                    // Use Math.round to guarantee no floating decimal numbers trip binarypack
                     targetedAlien.x = Math.round(data.x);
                     targetedAlien.y = Math.round(data.y);
                     targetedAlien.isLocallyControlled = true; 
@@ -57,28 +56,33 @@ function setupConnection(conn) {
         // --- 🛸 ALIEN MASTER CLIENT SIDE (YOU) ---
         if (gameState.playerRole === 'alien-master') {
             if (data.type === 'SYNC_ENEMIES') {
-                // Safeguard against over-writing your local master target array slot
-                let activeDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
-                
-                // Unpack only sanitized network integers cleanly back into structural map arrays
-                gameState.enemies = data.enemies.map(ne => {
-                    return {
-                        id: ne.id,
-                        type: parseInt(ne.type) || 1,
-                        x: parseInt(ne.x),
-                        y: parseInt(ne.y),
-                        fIdx: parseInt(ne.fIdx) || 0,
-                        fT: 0,
-                        isDying: ne.isDying ? true : false,
-                        health: 5,
-                        width: 288,
-                        height: 288
-                    };
+                // Reconstruct the synced array objects so your local machine can handle animations independently
+                data.enemies.forEach(ne => {
+                    let localEn = gameState.enemies.find(e => e.id === ne.id);
+                    if (!localEn) {
+                        localEn = {
+                            id: ne.id,
+                            type: parseInt(ne.type) || 1,
+                            x: parseInt(ne.x),
+                            y: parseInt(ne.y),
+                            fIdx: 0,
+                            fT: 0,
+                            isDying: ne.isDying,
+                            health: 5,
+                            width: 288,
+                            height: 288
+                        };
+                        gameState.enemies.push(localEn);
+                    } else {
+                        // Smoothly update positions instead of overwriting the whole object frame clock
+                        localEn.x = ne.x;
+                        localEn.y = ne.y;
+                        localEn.isDying = ne.isDying;
+                    }
                 });
-                
-                if (activeDrone && !gameState.enemies.some(e => e.id === gameState.controlledEnemyId)) {
-                    gameState.enemies.push(activeDrone);
-                }
+
+                // Clean up dead enemies that are no longer in her list
+                gameState.enemies = gameState.enemies.filter(le => data.enemies.some(ne => ne.id === le.id) || le.id === gameState.controlledEnemyId);
             }
             if (data.type === 'SYNC_FARMER') {
                 gameState.playerX = parseInt(data.playerX);
@@ -96,6 +100,21 @@ function setupConnection(conn) {
                 gameState.activeSlot = parseInt(data.activeSlot) || 0;
                 gameState.inventory = data.inventory;
                 gameState.hasScythe = data.hasScythe;
+                
+                // AUDIO SYNCHRONIZER: Triggers your local sound system based on her network actions
+                if (data.isShooting) {
+                    gameState.isShooting = true;
+                    if (shootSound.paused) shootSound.play().catch(() => {});
+                } else {
+                    gameState.isShooting = false;
+                    shootSound.pause();
+                }
+
+                if (data.isMoving) {
+                    if (moveSound.paused) moveSound.play().catch(() => {});
+                } else {
+                    moveSound.pause();
+                }
                 gameState.hasGun = data.hasGun;
             }
         }
