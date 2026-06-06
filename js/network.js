@@ -66,7 +66,22 @@ function setupConnection(conn) {
                 }
             }
 
-            // FIXED: Authoritative remote listener executes reset immediately upon request
+            // FIXED: Listen for seed theft and deploy an uncontrolled proxy alien grunt
+            if (data.type === 'SEED_STOLEN') {
+                let possible = [1];
+                if (gameState.enemyKillScore >= 20) possible.push(2);
+                if (gameState.enemyKillScore >= 40) possible.push(3);
+
+                let chosenType = possible[Math.floor(Math.random() * possible.length)];
+                let uncontrolledAlien = createEnemy(chosenType);
+                
+                if (uncontrolledAlien) {
+                    uncontrolledAlien.isLocallyControlled = false; // Runs automated tracking paths
+                    gameState.enemies.push(uncontrolledAlien);
+                    console.log(`📡 SEED FORFEITED: Uncontrolled Level ${chosenType} grunt deployed.`);
+                }
+            }
+
             if (data.type === 'REMOTE_SOFT_RESET') {
                 console.log("Peer network soft-reset packet verified.");
                 resetGameSession();
@@ -81,7 +96,6 @@ function setupConnection(conn) {
                 if (typeof triggerGameOver === 'function') triggerGameOver();
             }
 
-            // FIXED: Authoritative host listener executes reset immediately upon request
             if (data.type === 'REMOTE_SOFT_RESET') {
                 console.log("Host soft-reset packet verified.");
                 resetGameSession();
@@ -134,13 +148,13 @@ function setupConnection(conn) {
                     if (shootSound.paused) shootSound.play().catch(() => {});
                 } else {
                     gameState.isShooting = false;
-                    shootSound.pause();
+                    try { shootSound.pause(); } catch(e) {}
                 }
 
                 if (data.isMoving) {
                     if (moveSound.paused) moveSound.play().catch(() => {});
                 } else {
-                    moveSound.pause();
+                    try { moveSound.pause(); } catch(e) {}
                 }
                 gameState.hasGun = data.hasGun;
             }

@@ -16,6 +16,21 @@ setInterval(() => {
     }
 }, 60000);
 
+// Expose a function to explicitly spawn a single uncontrolled AI grunt when a seed is captured
+export function spawnUncontrolledAlienBonus() {
+    let possible = [1]; 
+    if (gameState.enemyKillScore >= 20) possible.push(2);
+    if (gameState.enemyKillScore >= 40) possible.push(3);
+
+    let chosenType = possible[Math.floor(Math.random() * possible.length)];
+    let newEnemy = createEnemy(chosenType);
+    
+    newEnemy.isLocallyControlled = false; 
+
+    gameState.enemies.push(newEnemy);
+    console.log(`📡 SEED FORFEITED: Uncontrolled Level ${chosenType} alien proxy deployed.`);
+}
+
 // Reset game variables safely in memory without killing the room session connection
 export function resetGameSession() {
     // 0. Hard stop and purge all active loop background tasks to prevent stacking speed bugs
@@ -95,7 +110,7 @@ export function resetGameSession() {
         startTrackingIntervals();
     }
 
-    // 3. FIXED RENDERING TRIGGER: Clear old screen artifacts and kick the rendering loop back to life!
+    // 3. Clear old screen artifacts and kick the rendering loop back to life!
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     gameLoop(); 
 
@@ -516,6 +531,13 @@ function gameLoop() {
 function spawnTick() {
     if (gameState.isPaused || gameState.isGameOver) return;
 
+    // --- VERSUS INTERCEPT SPANNER MODIFICATION ---
+    // Halt automatic AI path generation entirely when connected to another player link.
+    if (gameState.isMultiplayer) {
+        window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
+        return;
+    }
+
     const c1 = gameState.enemies.filter(e => e.type === 1).length,
         c2 = gameState.enemies.filter(e => e.type === 2).length,
         c3 = gameState.enemies.filter(e => e.type === 3).length;
@@ -609,17 +631,13 @@ joinMasterBtn.addEventListener('click', () => {
 window.addEventListener('keydown', e => {
     if (e.key === 'Enter') startGame();
 
-    // Check for lower, upper, and physical code structures safely
     if (e.key === 'r' || e.key === 'R' || e.keyCode === 82) {
         if (gameState.isGameOver) {
             console.log("🎯 R Key registered cleanly.");
-            
-            // Defensively pop any active element selection out of focus
             if (document.activeElement && document.activeElement.blur) {
                 document.activeElement.blur();
             }
 
-            // Sync peer state right away 
             if (gameState.isMultiplayer && gameState.peerConnection && gameState.peerConnection.open) {
                 try {
                     gameState.peerConnection.send({ type: 'REMOTE_SOFT_RESET' });
@@ -627,8 +645,6 @@ window.addEventListener('keydown', e => {
                     console.error("PeerJS sync reset frame dropped:", err);
                 }
             }
-            
-            // Fire local execution reset
             resetGameSession();
         }
     }
