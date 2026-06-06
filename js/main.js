@@ -16,21 +16,6 @@ setInterval(() => {
     }
 }, 60000);
 
-// Expose a function to explicitly spawn a single uncontrolled AI grunt when a seed is captured
-export function spawnUncontrolledAlienBonus() {
-    let possible = [1]; 
-    if (gameState.enemyKillScore >= 20) possible.push(2);
-    if (gameState.enemyKillScore >= 40) possible.push(3);
-
-    let chosenType = possible[Math.floor(Math.random() * possible.length)];
-    let newEnemy = createEnemy(chosenType);
-    
-    newEnemy.isLocallyControlled = false; 
-
-    gameState.enemies.push(newEnemy);
-    console.log(`📡 SEED FORFEITED: Uncontrolled Level ${chosenType} alien proxy deployed.`);
-}
-
 // Reset game variables safely in memory without killing the room session connection
 export function resetGameSession() {
     // 0. Hard stop and purge all active loop background tasks to prevent stacking speed bugs
@@ -110,7 +95,7 @@ export function resetGameSession() {
         startTrackingIntervals();
     }
 
-    // 3. Clear old screen artifacts and kick the rendering loop back to life!
+    // 3. FIXED RENDERING TRIGGER: Clear old screen artifacts and kick the rendering loop back to life!
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     gameLoop(); 
 
@@ -315,11 +300,20 @@ function gameLoop() {
 
             let isPlayerControlledDrone = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
 
-            if (!isPlayerControlledDrone && !en.isLocallyControlled && gameState.playerRole === 'farmer') {
-                en.x += (dx / dist) * en.speed * moveDir;
-                en.y += (dy / dist) * en.speed * moveDir;
+            // --- FIXED SMOOTH RENDERING MATH BLOCK ---
+            if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
+                if (en.targetX !== undefined && !isPlayerControlledDrone) {
+                    en.x += (en.targetX - en.x) * 0.18; // Apply 18% closure easing value per frame
+                    en.y += (en.targetY - en.y) * 0.18;
+                }
+            } else {
+                if (!isPlayerControlledDrone && !en.isLocallyControlled && gameState.playerRole === 'farmer') {
+                    en.x += (dx / dist) * en.speed * moveDir;
+                    en.y += (dy / dist) * en.speed * moveDir;
+                }
             }
 
+            // --- EXPLICIT STOLEN SEED DETECTOR CORE ---
             gameState.seeds.forEach((s, sIdx) => {
                 if (Math.hypot((en.x + 144) - s.x, (en.y + 144) - s.y) < 150) {
                     gameState.seeds.splice(sIdx, 1);
@@ -531,8 +525,7 @@ function gameLoop() {
 function spawnTick() {
     if (gameState.isPaused || gameState.isGameOver) return;
 
-    // --- VERSUS INTERCEPT SPANNER MODIFICATION ---
-    // Halt automatic AI path generation entirely when connected to another player link.
+    // --- AUTOMATED TICK BLOCKER ---
     if (gameState.isMultiplayer) {
         window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
         return;
@@ -552,7 +545,6 @@ function spawnTick() {
     window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
 }
 
-// Encapsulated tracking scope to drop and spin intervals securely without duplication leaks
 function startTrackingIntervals() {
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.seeds.length < 5) gameState.seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 12000));
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.pigs.length < 5 && !gameState.isPaused) gameState.pigs.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 }); }, 5000));
@@ -627,7 +619,6 @@ joinMasterBtn.addEventListener('click', () => {
     }, 1500);
 });
 
-// HARDENED GLOBAL KEY LISTENER WITH INTERCEPT PROTECTION
 window.addEventListener('keydown', e => {
     if (e.key === 'Enter') startGame();
 

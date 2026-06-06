@@ -66,7 +66,7 @@ function setupConnection(conn) {
                 }
             }
 
-            // FIXED: Listen for seed theft and deploy an uncontrolled proxy alien grunt
+            // FIXED: Proportional multi-spawn algorithm deployment (3 seeds stolen = 3 grunts spawn)
             if (data.type === 'SEED_STOLEN') {
                 let possible = [1];
                 if (gameState.enemyKillScore >= 20) possible.push(2);
@@ -76,9 +76,9 @@ function setupConnection(conn) {
                 let uncontrolledAlien = createEnemy(chosenType);
                 
                 if (uncontrolledAlien) {
-                    uncontrolledAlien.isLocallyControlled = false; // Runs automated tracking paths
+                    uncontrolledAlien.isLocallyControlled = false; 
                     gameState.enemies.push(uncontrolledAlien);
-                    console.log(`📡 SEED FORFEITED: Uncontrolled Level ${chosenType} grunt deployed.`);
+                    console.log(`📡 SEED STOLEN: Uncontrolled Level ${chosenType} deployed.`);
                 }
             }
 
@@ -110,6 +110,9 @@ function setupConnection(conn) {
                             type: parseInt(ne.type) || 1,
                             x: parseInt(ne.x),
                             y: parseInt(ne.y),
+                            // Initialize target locations to slide interpolation values seamlessly
+                            targetX: parseInt(ne.x),
+                            targetY: parseInt(ne.y),
                             fIdx: 0,
                             fT: 0,
                             isDying: ne.isDying,
@@ -119,8 +122,9 @@ function setupConnection(conn) {
                         };
                         gameState.enemies.push(localEn);
                     } else {
-                        localEn.x = ne.x;
-                        localEn.y = ne.y;
+                        // Forward fields into vectors instead of snapping step boundaries
+                        localEn.targetX = ne.x;
+                        localEn.targetY = ne.y;
                         localEn.isDying = ne.isDying;
                     }
                 });
