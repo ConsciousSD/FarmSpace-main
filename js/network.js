@@ -28,29 +28,32 @@ function setupConnection(conn) {
     conn.on('data', (data) => {
         if (!data || !data.type) return;
 
-        // --- 👩‍🌾 FARMER HOST SIDE (WIFE) ---
+        // --- 👩‍🌾 SURVIVOR / HOST SIDE (YOUR WIFE) ---
         if (gameState.playerRole === 'farmer') {
             if (data.type === 'CONTROL_MOVE') {
                 let targetedAlien = gameState.enemies.find(e => e.id === data.id);
                 
+                // If your master alien isn't on her map yet, her machine builds it instantly
                 if (!targetedAlien) {
-                    targetedAlien = createEnemy(1);
+                    targetedAlien = createEnemy(1); // Real live basic scout asset configuration
                     targetedAlien.id = data.id;
                     gameState.enemies.push(targetedAlien);
                 }
                 
+                // Update your position on her screen frame loop
                 targetedAlien.x = data.x;
                 targetedAlien.y = data.y;
-                targetedAlien.isLocallyControlled = true; 
+                targetedAlien.isLocallyControlled = true; // Prevents her AI scripts from overriding you
             }
         }
         
         // --- 🛸 ALIEN MASTER CLIENT SIDE (YOU) ---
         if (gameState.playerRole === 'alien-master') {
             if (data.type === 'SYNC_ENEMIES') {
-                // Reconstruct the synced aliens into native objects so your graphics processor can draw them
+                // Keep your player-controlled alien safe from getting wiped out by her empty single-player enemy array!
                 let activeDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
                 
+                // Read any background assets she has going on
                 gameState.enemies = data.enemies.map(networkEnemy => {
                     return {
                         id: networkEnemy.id,
@@ -60,18 +63,18 @@ function setupConnection(conn) {
                         fIdx: networkEnemy.fIdx,
                         fT: 0,
                         isDying: networkEnemy.isDying,
-                        deathFrame: networkEnemy.deathFrame,
-                        deathTimer: networkEnemy.deathTimer,
                         width: 288,
                         height: 288
                     };
                 });
                 
+                // Force-reinsert your playable vessel if her network packet left it out
                 if (activeDrone && !gameState.enemies.some(e => e.id === gameState.controlledEnemyId)) {
                     gameState.enemies.push(activeDrone);
                 }
             }
             if (data.type === 'SYNC_FARMER') {
+                // Mirror her exact player movements onto your master monitor viewport canvas
                 gameState.playerX = data.playerX;
                 gameState.playerY = data.playerY;
                 gameState.plowedPatches = data.plowedPatches;
