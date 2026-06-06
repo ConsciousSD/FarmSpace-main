@@ -394,7 +394,7 @@ function gameLoop() {
                         if (en.health === undefined) en.health = baseMax;
 
                         // TUNED: 0.5 damage per shot means exactly 1 damage per 2 connected hits
-                        let bulletDamage = 0.5; 
+                        let bulletDamage = 0.025; // 1 damage per 4 shots5; 
                         en.health -= bulletDamage;
                         en.lastHitTime = Date.now(); 
 
