@@ -284,7 +284,6 @@ function gameLoop() {
         }
     }
     if (gameState.gunCoolDownActive && gameState.killsSinceEmpty >= 10) { gameState.gunCoolDownActive = false; gameState.killsSinceEmpty = 0; }
-
     // --- ENEMIES LAYER ---
     for (let i = gameState.enemies.length - 1; i >= 0; i--) {
         let en = gameState.enemies[i];
@@ -341,7 +340,6 @@ function gameLoop() {
             else if (en.type === 3) enemyImage = enemySprite3;
             else enemyImage = enemySprite;
 
-            // Track target height for proper UI placement above the sprite head
             let currentSpriteHeight = 288;
 
             if (en.type === 2) {
@@ -365,7 +363,30 @@ function gameLoop() {
                 );
             }
 
-            // --- FIXED: UNIVERSAL ALIEN PLAYER HEALTH BAR OVERLAY ---
+            // --- HARDENED INDIVIDUAL I-FRAME DAMAGE TRACKER ---
+            if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
+                let pDx = en.x - gameState.playerX;
+                if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0))) {
+
+                    // Initialize timestamp checker field if absent
+                    if (!en.lastHitTime) en.lastHitTime = 0;
+
+                    // Strictly lock processing unless 250ms have elapsed since prior damage frame
+                    if (Date.now() - en.lastHitTime > 250) {
+                        en.health = (en.health !== undefined) ? en.health - 1 : 4;
+                        en.lastHitTime = Date.now(); // Reset internal I-Frame timer clock
+
+                        if (en.health <= 0) {
+                            en.isDying = true;
+                            en.deathFrame = 0;
+                            en.deathTimer = 0;
+                            gameState.enemyKillScore++;
+                        }
+                    }
+                }
+            }
+
+            // --- UNIVERSAL ALIEN PLAYER HEALTH BAR OVERLAY ---
             if (gameState.isMultiplayer && en.id === gameState.controlledEnemyId) {
                 let maxAlienHP = 5;
                 let currentHP = en.health !== undefined ? en.health : maxAlienHP;
@@ -373,48 +394,20 @@ function gameLoop() {
                 let barWidth = 140;
                 let barHeight = 12;
 
-                // Align bar horizontally based on sprite width context types
                 let spriteRenderWidth = (en.type === 3) ? 300 : 288;
                 let barX = en.x + (spriteRenderWidth / 2) - (barWidth / 2);
-
-                // Dynamically offset the Y position using our assigned asset tracking heights
                 let barY = en.y - 20;
 
-                // 1. Draw the background track wrapper frame
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
                 ctx.fillRect(barX, barY, barWidth, barHeight);
 
-                // 2. Compute fill percentage metrics securely
                 let hpPercentage = Math.max(0, Math.min(1, currentHP / maxAlienHP));
-
-                // 3. Dynamic color shifting (Cyan when healthy, warning red when low)
-                if (hpPercentage > 0.4) {
-                    ctx.fillStyle = '#00ffff';
-                } else {
-                    ctx.fillStyle = '#ff3333';
-                }
-
-                // 4. Fill the bar
+                ctx.fillStyle = hpPercentage > 0.4 ? '#00ffff' : '#ff3333';
                 ctx.fillRect(barX + 2, barY + 2, (barWidth - 4) * hpPercentage, barHeight - 4);
 
-                // 5. Apply a crisp geometric border line
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
                 ctx.lineWidth = 1;
                 ctx.strokeRect(barX, barY, barWidth, barHeight);
-            }
-            // FIXED: AK47 Gun Damage Fire-Rate Throttling (Applies health deduction every 15 frames instead of every frame)
-            if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
-                let pDx = en.x - gameState.playerX;
-                if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0)) && gameState.gameFrame % 15 === 0) {
-                    en.health = (en.health !== undefined) ? en.health - 1 : 4; // Safely handle base values
-
-                    if (en.health <= 0) {
-                        en.isDying = true;
-                        en.deathFrame = 0;
-                        en.deathTimer = 0;
-                        gameState.enemyKillScore++;
-                    }
-                }
             }
 
             // COLLISION RESOLUTION: Executed solely on Host Machine
