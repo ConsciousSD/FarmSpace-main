@@ -208,7 +208,19 @@ function gameLoop() {
         player.draw(ctx);
     } else {
         player.update();
+
+        // 🎯 DIRECTIONAL FLIP FOR THE LOCAL SURVIVOR (FARMER)
+        ctx.save();
+
+        if (!player.facingRight) {
+            // Translate to the center of the player, flip the X-axis, and translate back
+            ctx.translate(player.x + 144, player.y + 144);
+            ctx.scale(-1, 1);
+            ctx.translate(-(player.x + 144), -(player.y + 144));
+        }
+
         player.draw(ctx);
+        ctx.restore(); // Cleanly restore the canvas state so the rest of the map draws upright!
     }
 
     // --- HOTBAR HUD SYSTEM ---
