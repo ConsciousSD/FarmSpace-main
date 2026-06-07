@@ -44,6 +44,8 @@ function setupConnection(conn) {
                     masterAlien.y = 1250;
                     masterAlien.speed = 0; 
                     masterAlien.isLocallyControlled = true; 
+                    masterAlien.hasGun = true;       // Match initial main factory setups
+                    masterAlien.pickupDone = true;
                     gameState.enemies.push(masterAlien);
                 }
             }
@@ -63,6 +65,31 @@ function setupConnection(conn) {
                     targetedAlien.x = Math.round(data.x);
                     targetedAlien.y = Math.round(data.y);
                     targetedAlien.isLocallyControlled = true; 
+                }
+            }
+
+            // 🎯 NEW: Process manual gun firing instructions sent across link by client pilot click
+            if (data.type === 'ALIEN_MANUAL_FIRE') {
+                let shooter = gameState.enemies.find(e => e.id === data.id);
+                if (shooter && !shooter.isDying) {
+                    if (!shooter.lastManualFire) shooter.lastManualFire = 0;
+                    if (Date.now() - shooter.lastManualFire > 500) { 
+                        let dx = data.tx - shooter.x;
+                        let dy = data.ty - shooter.y;
+                        let angle = Math.atan2(dy, dx);
+                        let laserSpeed = 9; 
+
+                        if (!gameState.enemyLasers) gameState.enemyLasers = [];
+                        gameState.enemyLasers.push({
+                            x: shooter.x + 144,
+                            y: shooter.y + 144,
+                            vX: Math.cos(angle) * laserSpeed,
+                            vY: Math.sin(angle) * laserSpeed,
+                            width: 90,
+                            height: 90
+                        });
+                        shooter.lastManualFire = Date.now();
+                    }
                 }
             }
 
@@ -114,20 +141,29 @@ function setupConnection(conn) {
                             fIdx: 0,
                             fT: 0,
                             isDying: ne.isDying,
-                            health: 5,
+                            health: ne.health,
                             width: 288,
-                            height: 288
+                            height: 288,
+                            
+                            // 🎯 UNPACK WEAPON CAPABILITY ON FIRST GENERATION TICK
+                            hasGun: ne.hasGun ? true : false,
+                            pickupDone: ne.pickupDone ? true : false
                         };
                         gameState.enemies.push(localEn);
                     } else {
                         localEn.targetX = ne.x;
                         localEn.targetY = ne.y;
                         localEn.isDying = ne.isDying;
+                        
+                        // 🎯 RE-SYNC RUNTIME MODIFIERS EVERY TICK LOOP 
+                        localEn.hasGun = ne.hasGun ? true : false;
+                        localEn.pickupDone = ne.pickupDone ? true : false;
                     }
                 });
                 
                 gameState.enemies = gameState.enemies.filter(le => data.enemies.some(ne => ne.id === le.id) || le.id === gameState.controlledEnemyId);
             }
+            
             if (data.type === 'SYNC_FARMER') {
                 gameState.playerX = parseInt(data.playerX);
                 gameState.playerY = parseInt(data.playerY);
@@ -145,7 +181,9 @@ function setupConnection(conn) {
                 gameState.inventory = data.inventory;
                 gameState.hasScythe = data.hasScythe;
                 
-                // ROCKET FUEL NETWORK INTERCEPT: Read incoming value from host data packets
+                // 🎯 RE-EXTRACT ACTIVE RED LINEAR LASERS STREAM PACKETS HERE 
+                gameState.enemyLasers = data.enemyLasers || [];
+                
                 if (data.rocketFuel !== undefined) {
                     gameState.rocketFuel = data.rocketFuel;
                 }
