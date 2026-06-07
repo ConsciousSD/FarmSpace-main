@@ -37,27 +37,22 @@ function drawRocketFuelBar() {
     const barWidth = 400;
     const barHeight = 26;
     const x = (CANVAS_WIDTH - barWidth) / 2;
-    const y = 125; // Sits neatly under hotbar slots container background
+    const y = 125; 
 
-    // Background Panel
     ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     ctx.fillRect(x, y, barWidth, barHeight);
 
-    // Progression Clamp Math
     let currentFuel = gameState.rocketFuel || 0;
     let maxFuel = gameState.maxRocketFuel || 500;
     let fillPct = Math.max(0, Math.min(1, currentFuel / maxFuel));
 
-    // Fill Color: Rocket Fire Orange
     ctx.fillStyle = '#ffaa00';
     ctx.fillRect(x + 3, y + 3, (barWidth - 6) * fillPct, barHeight - 6);
 
-    // Frame Border Strokes
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, barWidth, barHeight);
 
-    // Centered Typography Text Data
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ffffff';
@@ -81,9 +76,7 @@ function dispatchMasterVesselSpawn() {
         fT: 0,
         width: 288,
         height: 288,
-        health: 50, // Enemy player health set to a 50 HP pool limit
-        
-        // Born cleanly unarmed on session boot/reload configurations
+        health: 50, 
         hasGun: false,
         pickupDone: false
     });
@@ -203,15 +196,21 @@ function gameLoop() {
 
     // --- PLAYER DRAW LAYER ---
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
+        // 🎯 LERP INTERPOLATION ENGINE: Eliminates jittering entirely
+        if (gameState.targetPlayerX !== undefined) {
+            gameState.playerX += (gameState.targetPlayerX - gameState.playerX) * 0.22;
+            gameState.playerY += (gameState.targetPlayerY - gameState.playerY) * 0.22;
+        }
         player.x = gameState.playerX;
         player.y = gameState.playerY;
+        
         if (gameState.moveLeft) player.facingRight = false;
         if (gameState.moveRight) player.facingRight = true;
         player.draw(ctx);
     } else {
         player.update();
 
-        // 🎯 FARMER ORIENTATION MATRIX MIRRORING REPAIR BLOCK
+        // Directional flip logic
         ctx.save();
         if (player.facingRight) {
             ctx.translate(player.x + 144, player.y + 144);
@@ -244,7 +243,6 @@ function gameLoop() {
         else if (item === 'gun') ctx.drawImage(ak47Idle, boxX + 5, startY + 5, boxSize - 10, boxSize - 10);
     }
 
-    // --- DRAW ROCKET FUEL METRIC ---
     drawRocketFuelBar();
 
     if (gameState.isPaused) { requestAnimationFrame(gameLoop); return; }
@@ -281,7 +279,6 @@ function gameLoop() {
         return;
     }
 
-    // --- SHARED GAME OVER UI ---
     if (gameState.isGameOver) {
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         ctx.textAlign = 'center'; ctx.fillStyle = 'white'; ctx.font = 'bold 160px Arial';
@@ -314,12 +311,11 @@ function gameLoop() {
         }
     }
 
-    // --- ALIEN MASTER CONTROLLER TRACKING INTERCEPT (CLIENT PREDICTION IMPLEMENTATION) ---
+    // --- ALIEN MASTER CONTROLLER TRACKING INTERCEPT (LOCAL CLIENT-SIDE PREDICTION) ---
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && gameState.peerConnection && gameState.peerConnection.open) {
         if (!gameState.isAlienDead) {
             let myDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
             if (myDrone) {
-                // 🏎️ SNAPPY PREDICTION ENGINE: Process local commands instantly without echo network latencies
                 let manualMoveSpeed = 7; 
                 if (gameState.moveLeft) myDrone.x -= manualMoveSpeed; if (gameState.moveRight) myDrone.x += manualMoveSpeed;
                 if (gameState.moveUp) myDrone.y -= manualMoveSpeed; if (gameState.moveDown) myDrone.y += manualMoveSpeed;
@@ -440,10 +436,9 @@ function gameLoop() {
 
             let isPlayerControlledDrone = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
 
-            // --- POSITION MANAGEMENT ENGINES WITH PREDICTION BYPASS CHECKS ---
             if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
                 if (isPlayerControlledDrone) {
-                    // prediction block loops manage this instance
+                    // prediction block loops handle this instance natively
                 } else if (en.targetX !== undefined) {
                     en.x += (en.targetX - en.x) * 0.25; 
                     en.y += (en.targetY - en.y) * 0.25;
@@ -462,7 +457,7 @@ function gameLoop() {
 
                 if (en.laserCooldown >= 90 && dist < 900) { 
                     let angle = Math.atan2(dy, dx);
-                    let laserSpeed = 4; // 📉 Velocity adjustments slowed to matching gameplay settings limits
+                    let laserSpeed = 4; 
 
                     gameState.enemyLasers.push({
                         x: en.x + 144, 
@@ -593,13 +588,11 @@ function gameLoop() {
     for (let l = gameState.enemyLasers.length - 1; l >= 0; l--) {
         let laser = gameState.enemyLasers[l];
         
-        // Only host calculates standard trajectory displacements
         if (gameState.playerRole === 'farmer') {
             laser.x += laser.vX;
             laser.y += laser.vY;
         }
 
-        // UNIVERSAL RENDERING STAGE: Displays on both screens
         if (laserBullet.complete && laserBullet.naturalWidth !== 0) {
             ctx.drawImage(laserBullet, 0, 0, 448, 448, laser.x - 45, laser.y - 45, laser.width || 90, laser.height || 90);
         } else {
@@ -675,7 +668,6 @@ function gameLoop() {
         }
     });
 
-    // --- CROP HARVEST & ROCKET FUEL ACCUMULATION LOOP ---
     for (let i = gameState.plantedWatermelons.length - 1; i >= 0; i--) {
         let wm = gameState.plantedWatermelons[i];
         if (!wm.done) { wm.fT++; if (wm.fT > 50) { wm.fIdx++; wm.fT = 0; if (wm.fIdx >= 8) wm.done = true; } }
@@ -733,7 +725,6 @@ function gameLoop() {
 
     if (gameState.carryingGrenade) ctx.drawImage(grenadeSprite, gameState.playerX + (player.facingRight ? 200 : -20), gameState.playerY + 80, 160, 160);
 
-    // --- RENDER FLOATING DAMAGE POPUPS ---
     for (let k = gameState.damageNumbers.length - 1; k >= 0; k--) {
         let dmgNum = gameState.damageNumbers[k];
         dmgNum.y += dmgNum.vY;
@@ -754,7 +745,6 @@ function gameLoop() {
         }
     }
 
-    // --- HUD AND METRIC PRINTS ---
     ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(10, 10, 850, 240);
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
 
@@ -796,46 +786,58 @@ function gameLoop() {
         ctx.fillStyle = durPct > 0.35 ? '#00bfff' : '#FFaa00'; ctx.fillRect(210, 185, 200 * durPct, 30);
     }
 
-    // 🎯 NETWORK EMISSION PACKET BUFFER MANAGER (THROTTLED AT % 6 FOR SYSTEM STABILITY)
-    if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.peerConnection.open && gameState.gameFrame % 6 === 0) {
+    // =======================================================
+    // 📡 OPTIMIZED MULTIPLAYER VARIABLE SYNC TRAFFIC PANEL
+    // =======================================================
+    if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.peerConnection.open) {
         try {
-            gameState.peerConnection.send({
-                type: 'SYNC_ENEMIES',
-                enemies: gameState.enemies.map(en => ({
-                    id: en.id,
-                    x: Math.round(en.x),
-                    y: Math.round(en.y),
-                    type: parseInt(en.type) || 1,
-                    isDying: en.isDying ? true : false,
-                    health: en.health,
-                    hasGun: en.hasGun ? true : false,
-                    pickupDone: en.pickupDone ? true : false
-                }))
-            });
+            // 🏎️ FAST LANE (Every 3 frames): High-priority tracking updates
+            if (gameState.gameFrame % 3 === 0) {
+                gameState.peerConnection.send({
+                    type: 'SYNC_FARMER_FAST',
+                    playerX: Math.round(gameState.playerX),
+                    playerY: Math.round(gameState.playerY),
+                    isShooting: gameState.isShooting,
+                    isMoving: localIsMoving,
+                    activeSlot: parseInt(gameState.activeSlot) || 0,
+                    hasGun: gameState.hasGun,
+                    enemyLasers: gameState.enemyLasers.map(l => ({ x: Math.round(l.x), y: Math.round(l.y), width: l.width, height: l.height }))
+                });
 
-            gameState.peerConnection.send({
-                type: 'SYNC_FARMER',
-                playerX: Math.round(gameState.playerX),
-                playerY: Math.round(gameState.playerY),
-                isShooting: gameState.isShooting,
-                isMoving: localIsMoving,
-                plowedPatches: gameState.plowedPatches.map(p => ({ x: p.x, y: p.y, size: p.size })),
-                plantedWatermelons: gameState.plantedWatermelons.map(w => ({ x: w.x, y: w.y, fIdx: w.fIdx, done: w.done })),
-                seeds: gameState.seeds.map(s => ({ x: s.x, y: s.y })),
-                pigs: gameState.pigs.map(p => ({ x: Math.round(p.x), y: Math.round(p.y), vx: p.vx, vy: p.vy, fIdx: p.fIdx })),
-                chickens: gameState.chickens.map(c => ({ x: Math.round(c.x), y: Math.round(c.y), vx: c.vx, vy: c.vy, fIdx: c.fIdx })),
-                charms: gameState.charms.map(ch => ({ x: ch.x, y: ch.y, width: ch.width, height: ch.height })),
-                grenadesOnGround: gameState.grenadesOnGround.map(g => ({ x: g.x, y: g.y })),
-                activeGrenades: gameState.activeGrenades.map(ag => ({ x: ag.x, y: ag.y, exploded: ag.exploded })),
-                carryingGrenade: gameState.carryingGrenade ? true : false,
-                guns: gameState.guns.map(gu => ({ x: gu.x, y: gu.y })),
-                enemyLasers: gameState.enemyLasers.map(l => ({ x: Math.round(l.x), y: Math.round(l.y), width: l.width, height: l.height })), 
-                activeSlot: parseInt(gameState.activeSlot) || 0,
-                inventory: gameState.inventory,
-                hasScythe: gameState.hasScythe,
-                hasGun: gameState.hasGun,
-                rocketFuel: gameState.rocketFuel 
-            });
+                gameState.peerConnection.send({
+                    type: 'SYNC_ENEMIES',
+                    enemies: gameState.enemies.map(en => ({
+                        id: en.id,
+                        x: Math.round(en.x),
+                        y: Math.round(en.y),
+                        type: parseInt(en.type) || 1,
+                        isDying: en.isDying ? true : false,
+                        health: en.health,
+                        hasGun: en.hasGun ? true : false,
+                        pickupDone: en.pickupDone ? true : false
+                    }))
+                });
+            }
+
+            // 🐌 SLOW LANE (Every 12 frames): Static or low-priority entities
+            if (gameState.gameFrame % 12 === 0) {
+                gameState.peerConnection.send({
+                    type: 'SYNC_FARMER_SLOW',
+                    plowedPatches: gameState.plowedPatches.map(p => ({ x: p.x, y: p.y, size: p.size })),
+                    plantedWatermelons: gameState.plantedWatermelons.map(w => ({ x: w.x, y: w.y, fIdx: w.fIdx, done: w.done })),
+                    seeds: gameState.seeds.map(s => ({ x: s.x, y: s.y })),
+                    pigs: gameState.pigs.map(p => ({ x: Math.round(p.x), y: Math.round(p.y), vx: p.vx, vy: p.vy, fIdx: p.fIdx })),
+                    chickens: gameState.chickens.map(c => ({ x: Math.round(c.x), y: Math.round(c.y), vx: c.vx, vy: c.vy, fIdx: c.fIdx })),
+                    charms: gameState.charms.map(ch => ({ x: ch.x, y: ch.y, width: ch.width, height: ch.height })),
+                    grenadesOnGround: gameState.grenadesOnGround.map(g => ({ x: g.x, y: g.y })),
+                    activeGrenades: gameState.activeGrenades.map(ag => ({ x: ag.x, y: ag.y, exploded: ag.exploded })),
+                    carryingGrenade: gameState.carryingGrenade ? true : false,
+                    guns: gameState.guns.map(gu => ({ x: gu.x, y: gu.y })),
+                    inventory: gameState.inventory,
+                    hasScythe: gameState.hasScythe,
+                    rocketFuel: gameState.rocketFuel 
+                });
+            }
         } catch (e) { }
     }
 

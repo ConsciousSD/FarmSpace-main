@@ -45,7 +45,6 @@ function setupConnection(conn) {
                     masterAlien.speed = 0; 
                     masterAlien.isLocallyControlled = true; 
                     
-                    // Born completely unarmed on reset match launch states
                     masterAlien.hasGun = false;       
                     masterAlien.pickupDone = false;
                     
@@ -71,7 +70,6 @@ function setupConnection(conn) {
                 }
             }
 
-            // Process manual weapon triggers fired from the client player side clicking inputs
             if (data.type === 'ALIEN_MANUAL_FIRE') {
                 let shooter = gameState.enemies.find(e => e.id === data.id);
                 if (shooter && !shooter.isDying) {
@@ -80,7 +78,7 @@ function setupConnection(conn) {
                         let dx = data.tx - shooter.x;
                         let dy = data.ty - shooter.y;
                         let angle = Math.atan2(dy, dx);
-                        let laserSpeed = 5; // 📉 Slowed down velocity clamp matching gameplay balances
+                        let laserSpeed = 5; 
 
                         if (!gameState.enemyLasers) gameState.enemyLasers = [];
                         gameState.enemyLasers.push({
@@ -105,7 +103,6 @@ function setupConnection(conn) {
                 let uncontrolledAlien = createEnemy(chosenType);
                 
                 if (uncontrolledAlien) {
-                    // 🎯 UNIQUE ID STAMPER GENERATOR FIX: Stops background warping/snapping glitches!
                     uncontrolledAlien.id = `stolen-seed-spawn-${Math.floor(Math.random() * 9999999)}`;
                     uncontrolledAlien.isLocallyControlled = false; 
                     
@@ -166,29 +163,13 @@ function setupConnection(conn) {
                 gameState.enemies = gameState.enemies.filter(le => data.enemies.some(ne => ne.id === le.id) || le.id === gameState.controlledEnemyId);
             }
             
-            if (data.type === 'SYNC_FARMER') {
-                gameState.playerX = parseInt(data.playerX);
-                gameState.playerY = parseInt(data.playerY);
-                gameState.plowedPatches = data.plowedPatches || [];
-                gameState.plantedWatermelons = data.plantedWatermelons || [];
-                gameState.seeds = data.seeds || [];
-                gameState.pigs = data.pigs || [];
-                gameState.chickens = data.chickens || [];
-                gameState.charms = data.charms || [];
-                gameState.grenadesOnGround = data.grenadesOnGround || [];
-                gameState.activeGrenades = data.activeGrenades || [];
-                gameState.carryingGrenade = data.carryingGrenade;
-                gameState.guns = data.guns || [];
+            // 🏎️ FAST LANE TRAFFIC INGEST
+            if (data.type === 'SYNC_FARMER_FAST') {
+                gameState.targetPlayerX = parseInt(data.playerX); 
+                gameState.targetPlayerY = parseInt(data.playerY);
                 gameState.activeSlot = parseInt(data.activeSlot) || 0;
-                gameState.inventory = data.inventory;
-                gameState.hasScythe = data.hasScythe;
-                
-                // Pull incoming synchronized lasers positions straight from the network packet channel
+                gameState.hasGun = data.hasGun;
                 gameState.enemyLasers = data.enemyLasers || [];
-                
-                if (data.rocketFuel !== undefined) {
-                    gameState.rocketFuel = data.rocketFuel;
-                }
                 
                 if (data.isShooting) {
                     gameState.isShooting = true;
@@ -203,7 +184,26 @@ function setupConnection(conn) {
                 } else {
                     try { moveSound.pause(); } catch(e) {}
                 }
-                gameState.hasGun = data.hasGun;
+            }
+
+            // 🐌 SLOW LANE TRAFFIC INGEST
+            if (data.type === 'SYNC_FARMER_SLOW') {
+                gameState.plowedPatches = data.plowedPatches || [];
+                gameState.plantedWatermelons = data.plantedWatermelons || [];
+                gameState.seeds = data.seeds || [];
+                gameState.pigs = data.pigs || [];
+                gameState.chickens = data.chickens || [];
+                gameState.charms = data.charms || [];
+                gameState.grenadesOnGround = data.grenadesOnGround || [];
+                gameState.activeGrenades = data.activeGrenades || [];
+                gameState.carryingGrenade = data.carryingGrenade;
+                gameState.guns = data.guns || [];
+                gameState.inventory = data.inventory;
+                gameState.hasScythe = data.hasScythe;
+                
+                if (data.rocketFuel !== undefined) {
+                    gameState.rocketFuel = data.rocketFuel;
+                }
             }
         }
     });
