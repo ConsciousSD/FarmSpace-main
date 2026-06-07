@@ -32,6 +32,39 @@ function createDamageNumber(x, y, amount, isCritical = false) {
     });
 }
 
+// UI RENDERING METHOD: Draws a clean sci-fi Rocket Fuel bar right below the hotbar slots
+function drawRocketFuelBar() {
+    const barWidth = 400;
+    const barHeight = 26;
+    const x = (CANVAS_WIDTH - barWidth) / 2;
+    const y = 125; // Sits neatly under hotbar slots container background
+
+    // Background Panel
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillRect(x, y, barWidth, barHeight);
+
+    // Progression Clamp Math
+    let currentFuel = gameState.rocketFuel || 0;
+    let maxFuel = gameState.maxRocketFuel || 500;
+    let fillPct = Math.max(0, Math.min(1, currentFuel / maxFuel));
+
+    // Fill Color: Rocket Fire Orange
+    ctx.fillStyle = '#ffaa00'; 
+    ctx.fillRect(x + 3, y + 3, (barWidth - 6) * fillPct, barHeight - 6);
+
+    // Frame Border Strokes
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, barWidth, barHeight);
+
+    // Centered Typography Text Data
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px Arial, sans-serif';
+    ctx.fillText(`ROCKET FUEL: ${currentFuel} / ${maxFuel}`, x + barWidth / 2, y + barHeight / 2);
+}
+
 // Helper method to execute a client master drone respawn over the link lane
 function dispatchMasterVesselSpawn() {
     let uniqueDroneId = "master-drone-" + Math.floor(Math.random() * 99999);
@@ -75,6 +108,7 @@ export function resetGameSession() {
     gameState.pigsSaved = 0;
     gameState.chickensSaved = 0;
     gameState.seedInventory = 0;
+    gameState.rocketFuel = 0; // SYSTEM RESET: Resets rocket fuel back to 0 points
     gameState.ammo = 0;
     gameState.hasGun = false;
     gameState.gunCoolDownActive = false;
@@ -194,6 +228,9 @@ function gameLoop() {
         if (item === 'scythe') ctx.drawImage(scytheSprite, boxX + 10, startY + 10, boxSize - 20, boxSize - 20);
         else if (item === 'gun') ctx.drawImage(ak47Idle, boxX + 5, startY + 5, boxSize - 10, boxSize - 10);
     }
+
+    // --- DRAW ROCKET FUEL METRIC ---
+    drawRocketFuelBar();
 
     if (gameState.isPaused) { requestAnimationFrame(gameLoop); return; }
     gameState.gameFrame++;
@@ -381,24 +418,21 @@ function gameLoop() {
                 );
             }
 
-            // --- WEAPON DAMAGE CONTROLLER: 1 DAMAGE PER 2 BULLETS (0.5 DAMAGE) ---
+            // --- WEAPON DAMAGE CONTROLLER ---
             if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
                 let pDx = en.x - gameState.playerX;
                 if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0))) {
                     
                     if (!en.lastHitTime) en.lastHitTime = 0;
 
-                    // Reduced I-Frame cooldown slightly so the AK can track ticks closely
                     if (Date.now() - en.lastHitTime > 380) {
                         let baseMax = (isPlayerControlledDrone) ? 50 : 10;
                         if (en.health === undefined) en.health = baseMax;
 
-                        // TUNED: 0.5 damage per shot means exactly 1 damage per 2 connected hits
-                        let bulletDamage = 0.25; // 1 damage per 4 shots5; 
+                        let bulletDamage = 0.25; 
                         en.health -= bulletDamage;
                         en.lastHitTime = Date.now(); 
 
-                        // Accumulate floats cleanly by displaying absolute damage ticks gracefully
                         createDamageNumber(en.x + 144, en.y, bulletDamage, false);
 
                         if (en.health <= 0) {
@@ -413,7 +447,7 @@ function gameLoop() {
 
             // --- UNIVERSAL ALIEN PLAYER HEALTH BAR OVERLAY ---
             if (gameState.isMultiplayer && en.id === gameState.controlledEnemyId) {
-                let maxAlienHP = 50; // Updated track frame bounds to 50
+                let maxAlienHP = 50;
                 let currentHP = en.health !== undefined ? en.health : maxAlienHP;
 
                 let barWidth = 140;
@@ -501,17 +535,26 @@ function gameLoop() {
         }
     });
 
+    // --- CROP HARVEST & ROCKET FUEL ACCUMULATION LOOP ---
     for (let i = gameState.plantedWatermelons.length - 1; i >= 0; i--) {
         let wm = gameState.plantedWatermelons[i];
         if (!wm.done) { wm.fT++; if (wm.fT > 50) { wm.fIdx++; wm.fT = 0; if (wm.fIdx >= 8) wm.done = true; } }
         let wmCols = 3, wmSize = 288;
         ctx.drawImage(watermelonSprite, (wm.fIdx % wmCols) * wmSize, Math.floor(wm.fIdx / wmCols) * wmSize, wmSize, wmSize, wm.x, wm.y, 288, 288);
+        
         if (wm.done && checkCollision(player, wm) && gameState.playerRole === 'farmer') {
             gameState.plantedWatermelons.splice(i, 1); 
             watermelonPickupSound.play().catch(() => {});
+
+            // ROCKET FUEL ACCUMULATION SYSTEM: Grant +50 Points upon gathering a fully grown plant crop
+            gameState.rocketFuel = (gameState.rocketFuel || 0) + 50;
+            if (gameState.rocketFuel > gameState.maxRocketFuel) {
+                gameState.rocketFuel = gameState.maxRocketFuel; // Structural cap clamp boundary enforce
+            }
+
             let target = gameState.enemies.find(e => !e.isDying);
             if (target) { 
-                let cropDamage = 25; // Adjusted explosive scaling ratio
+                let cropDamage = 25; 
                 target.health = (target.health !== undefined) ? target.health - cropDamage : 0;
                 createDamageNumber(target.x + 144, target.y, cropDamage, true);
 
@@ -647,7 +690,8 @@ function gameLoop() {
                 activeSlot: parseInt(gameState.activeSlot) || 0,
                 inventory: gameState.inventory,
                 hasScythe: gameState.hasScythe,
-                hasGun: gameState.hasGun
+                hasGun: gameState.hasGun,
+                rocketFuel: gameState.rocketFuel // SYNC OVER NETWORK CHANNEL: Keeps the secondary player matching
             });
         } catch(e) {}
     }
@@ -674,8 +718,10 @@ function spawnTick() {
 
     if (possible.length > 0) {
         let spawnedEnemy = createEnemy(possible[Math.floor(Math.random() * possible.length)]);
-        spawnedEnemy.health = 10; // Normalized minion pool matching scaling constraints
-        gameState.enemies.push(spawnedEnemy);
+        if (spawnedEnemy) {
+            spawnedEnemy.health = spawnedEnemy.type === 2 ? 3 : (spawnedEnemy.type === 3 ? 5 : 2);
+            gameState.enemies.push(spawnedEnemy);
+        }
     }
 
     window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);

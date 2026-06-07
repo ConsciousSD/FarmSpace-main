@@ -35,7 +35,6 @@ function setupConnection(conn) {
             if (data.type === 'SPAWN_MASTER_VESSEL') {
                 console.log(`Spawning host puppet instance for Master Drone: ${data.id}`);
                 
-                // Clear any lingering instances of old master drone entities first
                 gameState.enemies = gameState.enemies.filter(e => !e.id.startsWith("master-drone-"));
 
                 let masterAlien = createEnemy(1); 
@@ -127,7 +126,6 @@ function setupConnection(conn) {
                     }
                 });
                 
-                // Keep entities matching unless it's our own drone (which we manage locally)
                 gameState.enemies = gameState.enemies.filter(le => data.enemies.some(ne => ne.id === le.id) || le.id === gameState.controlledEnemyId);
             }
             if (data.type === 'SYNC_FARMER') {
@@ -146,6 +144,11 @@ function setupConnection(conn) {
                 gameState.activeSlot = parseInt(data.activeSlot) || 0;
                 gameState.inventory = data.inventory;
                 gameState.hasScythe = data.hasScythe;
+                
+                // ROCKET FUEL NETWORK INTERCEPT: Read incoming value from host data packets
+                if (data.rocketFuel !== undefined) {
+                    gameState.rocketFuel = data.rocketFuel;
+                }
                 
                 if (data.isShooting) {
                     gameState.isShooting = true;
