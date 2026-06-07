@@ -461,7 +461,7 @@ function gameLoop() {
 
                 if (en.laserCooldown >= 90 && dist < 900) {
                     let angle = Math.atan2(dy, dx);
-                    let laserSpeed = 8;
+                    let laserSpeed = 2;
 
                     gameState.enemyLasers.push({
                         x: en.x + 144,

@@ -77,7 +77,7 @@ function setupConnection(conn) {
                         let dx = data.tx - shooter.x;
                         let dy = data.ty - shooter.y;
                         let angle = Math.atan2(dy, dx);
-                        let laserSpeed = 9; 
+                        let laserSpeed = 2; 
 
                         if (!gameState.enemyLasers) gameState.enemyLasers = [];
                         gameState.enemyLasers.push({
