@@ -191,6 +191,10 @@ function setupConnection(conn) {
                 gameState.plowedPatches = data.plowedPatches || [];
                 gameState.plantedWatermelons = data.plantedWatermelons || [];
                 gameState.seeds = data.seeds || [];
+                gameState.tires = data.tires || [];
+                if (data.corral) {
+                    gameState.corral = data.corral;
+                }
                 gameState.pigs = data.pigs || [];
                 gameState.chickens = data.chickens || [];
                 gameState.charms = data.charms || [];

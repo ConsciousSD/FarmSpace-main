@@ -37,7 +37,7 @@ function drawRocketFuelBar() {
     const barWidth = 400;
     const barHeight = 26;
     const x = (CANVAS_WIDTH - barWidth) / 2;
-    const y = 125; 
+    const y = 125;
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     ctx.fillRect(x, y, barWidth, barHeight);
@@ -76,7 +76,7 @@ function dispatchMasterVesselSpawn() {
         fT: 0,
         width: 288,
         height: 288,
-        health: 50, 
+        health: 50,
         hasGun: false,
         pickupDone: false
     });
@@ -100,13 +100,13 @@ export function resetGameSession() {
     gameIntervals = [];
 
     gameState.isGameOver = false;
-    gameState.isGameWon = false; 
+    gameState.isGameWon = false;
     gameState.isPaused = false;
     gameState.enemyKillScore = 0;
     gameState.pigsSaved = 0;
     gameState.chickensSaved = 0;
     gameState.seedInventory = 0;
-    gameState.rocketFuel = 0; 
+    gameState.rocketFuel = 0;
     gameState.ammo = 0;
     gameState.hasGun = false;
     gameState.gunCoolDownActive = false;
@@ -137,7 +137,7 @@ export function resetGameSession() {
     gameState.activeGrenades = [];
     gameState.carryingGrenade = false;
     gameState.guns = [];
-    gameState.enemyLasers = []; 
+    gameState.enemyLasers = [];
 
     if (gameState.playerRole === 'alien-master') {
         dispatchMasterVesselSpawn();
@@ -203,7 +203,7 @@ function gameLoop() {
         }
         player.x = gameState.playerX;
         player.y = gameState.playerY;
-        
+
         if (gameState.moveLeft) player.facingRight = false;
         if (gameState.moveRight) player.facingRight = true;
         player.draw(ctx);
@@ -218,7 +218,7 @@ function gameLoop() {
             ctx.translate(-(player.x + 144), -(player.y + 144));
         }
         player.draw(ctx);
-        ctx.restore(); 
+        ctx.restore();
     }
 
     // --- HOTBAR HUD SYSTEM ---
@@ -316,7 +316,7 @@ function gameLoop() {
         if (!gameState.isAlienDead) {
             let myDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
             if (myDrone) {
-                let manualMoveSpeed = 7; 
+                let manualMoveSpeed = 7;
                 if (gameState.moveLeft) myDrone.x -= manualMoveSpeed; if (gameState.moveRight) myDrone.x += manualMoveSpeed;
                 if (gameState.moveUp) myDrone.y -= manualMoveSpeed; if (gameState.moveDown) myDrone.y += manualMoveSpeed;
 
@@ -334,7 +334,7 @@ function gameLoop() {
             }
         }
     }
-    
+
     // --- WEAPON GROUND COLLISION MANAGEMENT CONTAINER ---
     let gunToDestroy = null;
     gameState.guns.forEach((g) => {
@@ -352,11 +352,11 @@ function gameLoop() {
                 if (en.type === 1 && !en.isDying && !en.hasGun) {
                     if (checkCollision(en, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
                         gunToDestroy = g;
-                        en.hasGun = true;       
-                        en.pickupDone = false;   
-                        en.fIdx = 0;             
-                        en.fT = 0;               
-                        en.speed += 1.2;         
+                        en.hasGun = true;
+                        en.pickupDone = false;
+                        en.fIdx = 0;
+                        en.fT = 0;
+                        en.speed += 1.2;
                         seedPickupSound.currentTime = 0;
                         seedPickupSound.play().catch(() => { });
                     }
@@ -379,12 +379,17 @@ function gameLoop() {
         }
     });
     gameState.tires.forEach((t, i) => {
+        // This runs for BOTH players, so the asset draws on both screens!
         ctx.drawImage(tireSprite, 0, (Math.floor(gameState.gameFrame / 15) % 2) * 300, 300, 300, t.x, t.y, 300, 300);
-        if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) {
-            gameState.isPowered = true;
-            gameState.powerTimer = Date.now();
-            gameState.tires.splice(i, 1);
-            tirePickupSound.play().catch(() => { });
+
+        // Only the host machine (Farmer) calculates the collision physics
+        if (gameState.playerRole === 'farmer') {
+            if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) {
+                gameState.isPowered = true;
+                gameState.powerTimer = Date.now();
+                gameState.tires.splice(i, 1);
+                tirePickupSound.play().catch(() => { });
+            }
         }
     });
 
@@ -440,7 +445,7 @@ function gameLoop() {
                 if (isPlayerControlledDrone) {
                     // prediction block loops handle this instance natively
                 } else if (en.targetX !== undefined) {
-                    en.x += (en.targetX - en.x) * 0.25; 
+                    en.x += (en.targetX - en.x) * 0.25;
                     en.y += (en.targetY - en.y) * 0.25;
                 }
             } else {
@@ -455,19 +460,19 @@ function gameLoop() {
                 if (!en.laserCooldown) en.laserCooldown = 0;
                 en.laserCooldown++;
 
-                if (en.laserCooldown >= 90 && dist < 900) { 
+                if (en.laserCooldown >= 90 && dist < 900) {
                     let angle = Math.atan2(dy, dx);
-                    let laserSpeed = 4; 
+                    let laserSpeed = 4;
 
                     gameState.enemyLasers.push({
-                        x: en.x + 144, 
+                        x: en.x + 144,
                         y: en.y + 144,
                         vX: Math.cos(angle) * laserSpeed,
                         vY: Math.sin(angle) * laserSpeed,
-                        width: 90,     
+                        width: 90,
                         height: 90
                     });
-                    en.laserCooldown = 0; 
+                    en.laserCooldown = 0;
                 }
             }
 
@@ -486,8 +491,8 @@ function gameLoop() {
                     if (!en.pickupDone) {
                         en.fIdx++;
                         if (en.fIdx >= 4) {
-                            en.pickupDone = true; 
-                            en.fIdx = 0;          
+                            en.pickupDone = true;
+                            en.fIdx = 0;
                         }
                     } else {
                         en.fIdx = (en.fIdx + 1) % 6;
@@ -520,7 +525,7 @@ function gameLoop() {
                         let gunCol = trueFrame % 2;
                         let gunRow = Math.floor(trueFrame / 2);
                         ctx.drawImage(poltraGetsGun, gunCol * 1764, gunRow * 1764, 1764, 1764, en.x, en.y, 288, 288);
-                    } 
+                    }
                     else if (en.pickupDone && poltraWithGun.complete && poltraWithGun.naturalWidth !== 0) {
                         let loopCol = trueFrame % 2;
                         let loopRow = Math.floor(trueFrame / 2);
@@ -587,7 +592,7 @@ function gameLoop() {
     if (!gameState.enemyLasers) gameState.enemyLasers = [];
     for (let l = gameState.enemyLasers.length - 1; l >= 0; l--) {
         let laser = gameState.enemyLasers[l];
-        
+
         if (gameState.playerRole === 'farmer') {
             laser.x += laser.vX;
             laser.y += laser.vY;
@@ -680,7 +685,7 @@ function gameLoop() {
 
             gameState.rocketFuel = (gameState.rocketFuel || 0) + 50;
             if (gameState.rocketFuel > gameState.maxRocketFuel) {
-                gameState.rocketFuel = gameState.maxRocketFuel; 
+                gameState.rocketFuel = gameState.maxRocketFuel;
             }
 
             let target = gameState.enemies.find(e => !e.isDying);
@@ -826,6 +831,8 @@ function gameLoop() {
                     plowedPatches: gameState.plowedPatches.map(p => ({ x: p.x, y: p.y, size: p.size })),
                     plantedWatermelons: gameState.plantedWatermelons.map(w => ({ x: w.x, y: w.y, fIdx: w.fIdx, done: w.done })),
                     seeds: gameState.seeds.map(s => ({ x: s.x, y: s.y })),
+                    tires: gameState.tires.map(t => ({ x: t.x, y: t.y })),
+                    corral: { x: gameState.corral.x, y: gameState.corral.y, width: gameState.corral.width, height: gameState.corral.height },
                     pigs: gameState.pigs.map(p => ({ x: Math.round(p.x), y: Math.round(p.y), vx: p.vx, vy: p.vy, fIdx: p.fIdx })),
                     chickens: gameState.chickens.map(c => ({ x: Math.round(c.x), y: Math.round(c.y), vx: c.vx, vy: c.vy, fIdx: c.fIdx })),
                     charms: gameState.charms.map(ch => ({ x: ch.x, y: ch.y, width: ch.width, height: ch.height })),
@@ -835,7 +842,7 @@ function gameLoop() {
                     guns: gameState.guns.map(gu => ({ x: gu.x, y: gu.y })),
                     inventory: gameState.inventory,
                     hasScythe: gameState.hasScythe,
-                    rocketFuel: gameState.rocketFuel 
+                    rocketFuel: gameState.rocketFuel
                 });
             }
         } catch (e) { }
