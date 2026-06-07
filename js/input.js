@@ -153,7 +153,7 @@ export function initInput() {
     };
 
     // =======================================================
-    // MOUSE DOWN LEFT-CLICK RE-SELECTION (BACKUP SYSTEM)
+    // 🖱️ MOUSE INTERACTION SYSTEM (SELECTION & MANUAL FIRING)
     // =======================================================
     window.addEventListener('mousedown', e => {
         if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
@@ -161,6 +161,7 @@ export function initInput() {
             const clickX = (e.clientX - rect.left) * (2500 / rect.width);
             const clickY = (e.clientY - rect.top) * (2500 / rect.height);
 
+            // 🖱️ LEFT CLICK: Mind control re-selection
             if (e.button === 0) { 
                 let clickedAlien = gameState.enemies.find(en => {
                     let distance = Math.hypot((en.x + 144) - clickX, (en.y + 144) - clickY);
@@ -172,6 +173,27 @@ export function initInput() {
                     console.log(`Successfully mind-controlled target alien via click: ${clickedAlien.id}`);
                 }
             }
+            
+            // 🖱️ RIGHT CLICK: Manual laser blast trigger
+            else if (e.button === 2) {
+                if (!gameState.isAlienDead && gameState.controlledEnemyId) {
+                    if (gameState.peerConnection && gameState.peerConnection.open) {
+                        gameState.peerConnection.send({
+                            type: 'ALIEN_MANUAL_FIRE',
+                            id: gameState.controlledEnemyId,
+                            tx: clickX,
+                            ty: clickY
+                        });
+                    }
+                }
+            }
+        }
+    });
+
+    // Prevent context menu popups when right-clicking on the game canvas
+    window.addEventListener('contextmenu', e => {
+        if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
+            e.preventDefault();
         }
     });
 

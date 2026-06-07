@@ -14,9 +14,9 @@ export const gameState = {
     isPowered: false, powerTimer: 0, isPaused: false, isGameOver: false,
     
     // --- SPACE ROCKET FUEL MECHANICS ---
-    rocketFuel: 0,                              // Current accumulated engine fuel points
+    rocketFuel: 0,                             // Current accumulated engine fuel points
     maxRocketFuel: 500, 
-    isGameWon: false,                        // Peak storage container threshold cap
+    isGameWon: false,                          // Peak storage container threshold cap
 
     // --- WEAPONS, PLOWING & HOTBAR SYSTEM ---
     hasScythe: false, 
@@ -26,6 +26,9 @@ export const gameState = {
     activeSlot: 0,                             // The currently selected index
     scytheDurability: 3,                       // Swings remaining on current tool
     maxScytheDurability: 3,                    // Total baseline maximum capacity
+
+    // --- PROJECTILES & ATTACKS ---
+    enemyLasers: [],                           // 🎯 Tracks active linear laser bullet projectiles
 
     // --- ANIMALS & COLLECTIBLES ---
     pigs: [], carryingPig: null, pigsSaved: 0, lastPigSoundTime: 0,

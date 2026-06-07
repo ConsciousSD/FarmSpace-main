@@ -17,3 +17,6 @@ export const grenadeSprite = new Image(); grenadeSprite.src = 'assets/Grenade.pn
 export const chickenSprite = new Image(); chickenSprite.src = 'assets/SpaceChicken.png';
 export const charmSprite = new Image(); charmSprite.src = 'assets/charm.png';
 export const scytheSprite = new Image(); scytheSprite.src = 'assets/scythe.png'; 
+export const poltraGetsGun = new Image(); poltraGetsGun.src = 'assets/poltra_gets_gun.png';
+export const poltraWithGun = new Image();poltraWithGun.src = 'assets/poltra_with_gun.png'; 
+export const laserBullet = new Image();laserBullet.src = 'assets/lazer_bullet.png';
