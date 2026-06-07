@@ -745,7 +745,7 @@ function spawnTick() {
     if (gameState.isPaused || gameState.isGameOver) return;
 
     if (gameState.isMultiplayer) {
-        window.spawnTickTimeout = setTimeout(spawnTick, 8000 * gameState.spawnRateMultiplier);
+        window.spawnTickTimeout = setTimeout(spawnTick, 80000 * gameState.spawnRateMultiplier);
         return;
     }
 
