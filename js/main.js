@@ -209,10 +209,11 @@ function gameLoop() {
     } else {
         player.update();
 
-        // 🎯 DIRECTIONAL FLIP FOR THE LOCAL SURVIVOR (FARMER)
+        // 🎯 INVERTED DIRECTIONAL FLIP FOR THE FARMER
         ctx.save();
 
-        if (!player.facingRight) {
+        // Swapped from (!player.facingRight) to explicitly mirror when he IS facing right instead
+        if (player.facingRight) {
             // Translate to the center of the player, flip the X-axis, and translate back
             ctx.translate(player.x + 144, player.y + 144);
             ctx.scale(-1, 1);
@@ -220,7 +221,7 @@ function gameLoop() {
         }
 
         player.draw(ctx);
-        ctx.restore(); // Cleanly restore the canvas state so the rest of the map draws upright!
+        ctx.restore(); // Cleanly reset the canvas orientation matrix
     }
 
     // --- HOTBAR HUD SYSTEM ---
