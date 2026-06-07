@@ -331,7 +331,7 @@ function gameLoop() {
             }
         }
     }
-    
+
     // =======================================================
     // ⚔️ WEAPON GROUND COLLISION MULTIPLAYER RESOLUTION
     // =======================================================
@@ -344,11 +344,11 @@ function gameLoop() {
             gunToDestroy = g;
             seedPickupSound.play().catch(() => { });
             gameState.ammo = 100;
-            if (!gameState.inventory.includes('gun')) { 
-                let emptySlot = gameState.inventory.indexOf(null); 
-                if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; 
+            if (!gameState.inventory.includes('gun')) {
+                let emptySlot = gameState.inventory.indexOf(null);
+                if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun';
             }
-            gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); 
+            gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun');
             gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
         }
         // 2. Check if ANY living type-1 grunt grabs it (AI or Player Controlled)
@@ -357,11 +357,11 @@ function gameLoop() {
                 if (en.type === 1 && !en.isDying && !en.hasGun) {
                     if (checkCollision(en, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
                         gunToDestroy = g;
-                        en.hasGun = true;       
-                        en.pickupDone = false;   
-                        en.fIdx = 0;             
-                        en.fT = 0;               
-                        en.speed += 1.2;         
+                        en.hasGun = true;
+                        en.pickupDone = false;
+                        en.fIdx = 0;
+                        en.fT = 0;
+                        en.speed += 1.2;
                         seedPickupSound.currentTime = 0;
                         seedPickupSound.play().catch(() => { });
                     }
@@ -459,19 +459,19 @@ function gameLoop() {
                 if (!en.laserCooldown) en.laserCooldown = 0;
                 en.laserCooldown++;
 
-                if (en.laserCooldown >= 90 && dist < 900) { 
+                if (en.laserCooldown >= 90 && dist < 900) {
                     let angle = Math.atan2(dy, dx);
                     let laserSpeed = 8;
 
                     gameState.enemyLasers.push({
-                        x: en.x + 144, 
+                        x: en.x + 144,
                         y: en.y + 144,
                         vX: Math.cos(angle) * laserSpeed,
                         vY: Math.sin(angle) * laserSpeed,
-                        width: 90,     
+                        width: 90,
                         height: 90
                     });
-                    en.laserCooldown = 0; 
+                    en.laserCooldown = 0;
                 }
             }
 
@@ -528,7 +528,7 @@ function gameLoop() {
                     if (!en.pickupDone && poltraGetsGun.complete && poltraGetsGun.naturalWidth !== 0) {
                         let gunCol = trueFrame % 2;
                         let gunRow = Math.floor(trueFrame / 2);
-                        
+
                         ctx.drawImage(
                             poltraGetsGun,
                             gunCol * 1764, gunRow * 1764,
@@ -536,7 +536,7 @@ function gameLoop() {
                             en.x, en.y,
                             288, 288
                         );
-                    } 
+                    }
                     // 📐 RENDERING LAYER: STATE B (Switching to the 1800x1640 loop layout sheet matrix)
                     else if (en.pickupDone && poltraWithGun.complete && poltraWithGun.naturalWidth !== 0) {
                         let loopCol = trueFrame % 2;
@@ -544,10 +544,10 @@ function gameLoop() {
 
                         ctx.drawImage(
                             poltraWithGun,
-                            loopCol * 1800, loopRow * 1640, 
-                            1800, 1640,                     
-                            en.x, en.y,                     
-                            288, 288                        
+                            loopCol * 1800, loopRow * 1640,
+                            1800, 1640,
+                            en.x, en.y,
+                            288, 288
                         );
                     }
                 } else {
@@ -636,19 +636,28 @@ function gameLoop() {
     if (!gameState.enemyLasers) gameState.enemyLasers = [];
     for (let l = gameState.enemyLasers.length - 1; l >= 0; l--) {
         let laser = gameState.enemyLasers[l];
-        
-        laser.x += laser.vX;
-        laser.y += laser.vY;
 
-        // Render laser bullet scaled down cleanly out of full 448x448 source footprint
+        // 🚀 Only update projectile positions linearly if you are the host (Farmer)
+        // Client (Alien Master) positions are updated directly by incoming network sync packets
+        if (gameState.playerRole === 'farmer') {
+            laser.x += laser.vX;
+            laser.y += laser.vY;
+        }
+
+        // 🎯 UNIVERSAL RENDERING LAYER: Runs on BOTH screens perfectly
         if (laserBullet.complete && laserBullet.naturalWidth !== 0) {
-            ctx.drawImage(laserBullet, 0, 0, 448, 448, laser.x - 45, laser.y - 45, laser.width, laser.height);
+            ctx.drawImage(
+                laserBullet,
+                0, 0, 448, 448,
+                laser.x - 45, laser.y - 45,
+                laser.width || 90, laser.height || 90
+            );
         } else {
             ctx.fillStyle = '#ff00ff';
             ctx.fillRect(laser.x - 10, laser.y - 10, 20, 20);
         }
 
-        // Farmer collision hitbox intercept tracking
+        // Farmer collision hitbox intercept tracking (Authoritative Host Only)
         if (gameState.playerRole === 'farmer') {
             let hitTarget = { x: laser.x - 20, y: laser.y - 20, width: 40, height: 40 };
             if (checkCollision(player, hitTarget, true)) {
@@ -659,14 +668,13 @@ function gameLoop() {
                 triggerGameOver();
                 break;
             }
-        }
 
-        // Boundary map check cleanup loop to prevent memory leaks
-        if (laser.x < -500 || laser.x > 3000 || laser.y < -500 || laser.y > 3000) {
-            gameState.enemyLasers.splice(l, 1);
+            // Boundary map check cleanup loop to prevent memory leaks
+            if (laser.x < -500 || laser.x > 3000 || laser.y < -500 || laser.y > 3000) {
+                gameState.enemyLasers.splice(l, 1);
+            }
         }
     }
-
     // --- ANIMALS & CHARMS LAYER ---
     gameState.pigs.forEach((pig) => {
         if (pig === gameState.carryingPig) { pig.x = gameState.playerX + 50; pig.y = gameState.playerY + 50; }
@@ -731,7 +739,7 @@ function gameLoop() {
 
             gameState.rocketFuel = (gameState.rocketFuel || 0) + 50;
             if (gameState.rocketFuel > gameState.maxRocketFuel) {
-                gameState.rocketFuel = gameState.maxRocketFuel; 
+                gameState.rocketFuel = gameState.maxRocketFuel;
             }
 
             let target = gameState.enemies.find(e => !e.isDying);
@@ -851,7 +859,7 @@ function gameLoop() {
                     type: parseInt(en.type) || 1,
                     isDying: en.isDying ? true : false,
                     health: en.health,
-                    
+
                     // 🛸 TRANSMIT THE GUN VALUES OVER THE DATA LANE SO CLIENT OVERWRITES LOCAL DATA
                     hasGun: en.hasGun ? true : false,
                     pickupDone: en.pickupDone ? true : false
@@ -874,12 +882,12 @@ function gameLoop() {
                 activeGrenades: gameState.activeGrenades.map(ag => ({ x: ag.x, y: ag.y, exploded: ag.exploded })),
                 carryingGrenade: gameState.carryingGrenade ? true : false,
                 guns: gameState.guns.map(gu => ({ x: gu.x, y: gu.y })),
-                enemyLasers: gameState.enemyLasers.map(l => ({ x: Math.round(l.x), y: Math.round(l.y), width: l.width, height: l.height })), 
+                enemyLasers: gameState.enemyLasers.map(l => ({ x: Math.round(l.x), y: Math.round(l.y), width: l.width, height: l.height })),
                 activeSlot: parseInt(gameState.activeSlot) || 0,
                 inventory: gameState.inventory,
                 hasScythe: gameState.hasScythe,
                 hasGun: gameState.hasGun,
-                rocketFuel: gameState.rocketFuel 
+                rocketFuel: gameState.rocketFuel
             });
         } catch (e) { }
     }
