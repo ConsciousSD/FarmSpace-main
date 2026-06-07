@@ -590,8 +590,8 @@ function gameLoop() {
 
             // ROCKET FUEL ACCUMULATION SYSTEM: Grant +50 Points upon gathering a fully grown plant crop
             gameState.rocketFuel = (gameState.rocketFuel || 0) + 50;
-            if (gameState.rocketFuel > maxFuel) {
-                gameState.rocketFuel = maxFuel; // Structural cap clamp boundary enforce
+            if (gameState.rocketFuel > gameState.maxRocketFuel) {
+                gameState.rocketFuel = gameState.maxRocketFuel; // Structural cap clamp boundary enforce
             }
 
             let target = gameState.enemies.find(e => !e.isDying);

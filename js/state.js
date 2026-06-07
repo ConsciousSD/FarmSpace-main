@@ -15,7 +15,8 @@ export const gameState = {
     
     // --- SPACE ROCKET FUEL MECHANICS ---
     rocketFuel: 0,                              // Current accumulated engine fuel points
-    maxRocketFuel: 500,                         // Peak storage container threshold cap
+    maxRocketFuel: 500, 
+    isGameWon: false,                        // Peak storage container threshold cap
 
     // --- WEAPONS, PLOWING & HOTBAR SYSTEM ---
     hasScythe: false, 
