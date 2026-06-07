@@ -332,30 +332,37 @@ function gameLoop() {
         }
     }
     
-    // Weapon ground collisions
+    // =======================================================
+    // ⚔️ WEAPON GROUND COLLISION MULTIPLAYER RESOLUTION
+    // =======================================================
     let gunToDestroy = null;
-    gameState.guns.forEach((g, i) => {
+    gameState.guns.forEach((g) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 160, 160);
 
-        // Check if the FARMER picks up the gun
+        // 1. Check if the FARMER picks up the gun
         if (checkCollision(player, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
             gunToDestroy = g;
             seedPickupSound.play().catch(() => { });
             gameState.ammo = 100;
-            if (!gameState.inventory.includes('gun')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; }
-            gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
+            if (!gameState.inventory.includes('gun')) { 
+                let emptySlot = gameState.inventory.indexOf(null); 
+                if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; 
+            }
+            gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); 
+            gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
         }
-        // 🎯 Check if an ALIEN GRUNT (Type 1) grabs the gun instead
+        // 2. Check if ANY living type-1 grunt grabs it (AI or Player Controlled)
         else {
             gameState.enemies.forEach((en) => {
-                if (en.type === 1 && !en.isDying && !en.hasGun && !gunToDestroy) {
+                if (en.type === 1 && !en.isDying && !en.hasGun) {
                     if (checkCollision(en, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
                         gunToDestroy = g;
-                        en.hasGun = true;       // Flips this specific alien's flag to true!
-                        en.pickupDone = false;   // 🏁 False tells the frame updater to play the intro animation sheet first!
-                        en.fIdx = 0;             // Reset current frame to 0 to prevent cutting into the middle of the animation
-                        en.fT = 0;               // Reset frame tick timer
-                        en.speed += 1.2;         // Give the grunt a slight speed boost
+                        en.hasGun = true;       
+                        en.pickupDone = false;   
+                        en.fIdx = 0;             
+                        en.fT = 0;               
+                        en.speed += 1.2;         
+                        seedPickupSound.currentTime = 0;
                         seedPickupSound.play().catch(() => { });
                     }
                 }
@@ -368,6 +375,7 @@ function gameLoop() {
         let destroyIdx = gameState.guns.indexOf(gunToDestroy);
         if (destroyIdx !== -1) gameState.guns.splice(destroyIdx, 1);
     }
+
     gameState.seeds.forEach((s, i) => {
         ctx.drawImage(seedSprite, 0, (Math.floor(gameState.gameFrame / 10) % 2) * 288, 288, 288, s.x, s.y, 288, 288);
         if (checkCollision(player, { x: s.x, y: s.y, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70 }, true)) {
@@ -831,7 +839,8 @@ function gameLoop() {
         ctx.fillStyle = durPct > 0.35 ? '#00bfff' : '#FFaa00'; ctx.fillRect(210, 185, 200 * durPct, 30);
     }
 
-    if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.gameFrame % 3 === 0) {
+    // 🎯 THROTTLED NETWORK EMISSION PANEL (gameFrame % 6 BREATHING ROOM ADJUSTMENT)
+    if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.peerConnection.open && gameState.gameFrame % 6 === 0) {
         try {
             gameState.peerConnection.send({
                 type: 'SYNC_ENEMIES',
@@ -841,7 +850,11 @@ function gameLoop() {
                     y: Math.round(en.y),
                     type: parseInt(en.type) || 1,
                     isDying: en.isDying ? true : false,
-                    health: en.health
+                    health: en.health,
+                    
+                    // 🛸 TRANSMIT THE GUN VALUES OVER THE DATA LANE SO CLIENT OVERWRITES LOCAL DATA
+                    hasGun: en.hasGun ? true : false,
+                    pickupDone: en.pickupDone ? true : false
                 }))
             });
 
@@ -861,7 +874,7 @@ function gameLoop() {
                 activeGrenades: gameState.activeGrenades.map(ag => ({ x: ag.x, y: ag.y, exploded: ag.exploded })),
                 carryingGrenade: gameState.carryingGrenade ? true : false,
                 guns: gameState.guns.map(gu => ({ x: gu.x, y: gu.y })),
-                enemyLasers: gameState.enemyLasers.map(l => ({ x: Math.round(l.x), y: Math.round(l.y), width: l.width, height: l.height })), // Sync lasers over datachannel Link
+                enemyLasers: gameState.enemyLasers.map(l => ({ x: Math.round(l.x), y: Math.round(l.y), width: l.width, height: l.height })), 
                 activeSlot: parseInt(gameState.activeSlot) || 0,
                 inventory: gameState.inventory,
                 hasScythe: gameState.hasScythe,
