@@ -103,6 +103,7 @@ export function resetGameSession() {
     gameIntervals = [];
 
     gameState.isGameOver = false;
+    gameState.isGameWon = false; // SYSTEM RESET: Lower the victory flag configuration
     gameState.isPaused = false;
     gameState.enemyKillScore = 0;
     gameState.pigsSaved = 0;
@@ -235,6 +236,43 @@ function gameLoop() {
     if (gameState.isPaused) { requestAnimationFrame(gameLoop); return; }
     gameState.gameFrame++;
 
+    // =======================================================
+    // 🏆 VICTORY CONDITION & WIN SCREEN INTERCEPT
+    // =======================================================
+    let currentFuel = gameState.rocketFuel || 0;
+    let maxFuel = gameState.maxRocketFuel || 500;
+    if (currentFuel >= maxFuel) {
+        gameState.isGameWon = true; // Raise the flag for input frameworks to read
+        
+        // Deep space blue semi-transparent backdrop overlay
+        ctx.fillStyle = 'rgba(10, 25, 50, 0.92)'; 
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        
+        ctx.textAlign = 'center'; 
+        
+        // Shiny gold victory font header
+        ctx.fillStyle = '#ffd700'; ctx.font = 'bold 150px Arial';
+        ctx.fillText('VICTORY ACHIEVED!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 150);
+        
+        // Subtitle mission completion tag
+        ctx.fillStyle = 'white'; ctx.font = '60px Arial';
+        ctx.fillText('The Rocket is Fueled! You Escaped the Alien Horde!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
+        
+        // Player performance stats layout metrics
+        ctx.fillStyle = '#66ff66'; ctx.font = '50px Arial';
+        ctx.fillText(`Aliens Neutralized: ${gameState.enemyKillScore}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70);
+        ctx.fillText(`Pigs Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 140);
+
+        // Control layout instructions
+        ctx.fillStyle = 'white'; ctx.font = '45px Arial';
+        ctx.fillText('Press [ R ] to Play Again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
+        ctx.fillStyle = '#00ffff';
+        ctx.fillText('Press [ H ] for Home Start Menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 320);
+        
+        try { moveSound.pause(); } catch(e) {}
+        return; // 🛑 Stops everything behind it from updating
+    }
+
     // --- SHARED GAME OVER UI ---
     if (gameState.isGameOver) {
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -245,6 +283,10 @@ function gameLoop() {
 
         ctx.fillStyle = 'white'; ctx.font = '50px Arial';
         ctx.fillText('Press [ R ] to Restart Session', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
+        ctx.fillStyle = '#00ffff';
+        ctx.fillText('Press [ H ] for Home Start Menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 320);
+        
+        try { moveSound.pause(); } catch(e) {}
         return;
     }
 
@@ -548,8 +590,8 @@ function gameLoop() {
 
             // ROCKET FUEL ACCUMULATION SYSTEM: Grant +50 Points upon gathering a fully grown plant crop
             gameState.rocketFuel = (gameState.rocketFuel || 0) + 50;
-            if (gameState.rocketFuel > gameState.maxRocketFuel) {
-                gameState.rocketFuel = gameState.maxRocketFuel; // Structural cap clamp boundary enforce
+            if (gameState.rocketFuel > maxFuel) {
+                gameState.rocketFuel = maxFuel; // Structural cap clamp boundary enforce
             }
 
             let target = gameState.enemies.find(e => !e.isDying);
@@ -779,7 +821,8 @@ window.addEventListener('keydown', e => {
     if (e.key === 'Enter') startGame();
 
     if (e.key === 'r' || e.key === 'R' || e.keyCode === 82) {
-        if (gameState.isGameOver) {
+        // ALLOW RESET ON EITHER SCREEN LAYER
+        if (gameState.isGameOver || gameState.isGameWon) {
             console.log("🎯 R Key registered cleanly.");
             if (document.activeElement && document.activeElement.blur) {
                 document.activeElement.blur();
