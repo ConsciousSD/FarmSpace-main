@@ -82,8 +82,8 @@ function dispatchMasterVesselSpawn() {
         width: 288,
         height: 288,
         health: 50, // ADJUSTED: Enemy player health set to a 50 HP pool limit
-        hasGun: true,
-        pickupDone: true
+        hasGun: false,
+        pickupDone: false
     });
 
     if (gameState.peerConnection && gameState.peerConnection.open) {

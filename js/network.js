@@ -44,8 +44,8 @@ function setupConnection(conn) {
                     masterAlien.y = 1250;
                     masterAlien.speed = 0; 
                     masterAlien.isLocallyControlled = true; 
-                    masterAlien.hasGun = true;       // Match initial main factory setups
-                    masterAlien.pickupDone = true;
+                    masterAlien.hasGun = false;       // Match initial main factory setups
+                    masterAlien.pickupDone = false;
                     gameState.enemies.push(masterAlien);
                 }
             }
