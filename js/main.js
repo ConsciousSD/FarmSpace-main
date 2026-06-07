@@ -81,7 +81,9 @@ function dispatchMasterVesselSpawn() {
         fT: 0,
         width: 288,
         height: 288,
-        health: 50, // ADJUSTED: Enemy player health set to a 50 HP pool limit
+        health: 50, // Enemy player health set to a 50 HP pool limit
+        
+        // Born cleanly unarmed on session boot/reload configurations
         hasGun: false,
         pickupDone: false
     });
@@ -105,13 +107,13 @@ export function resetGameSession() {
     gameIntervals = [];
 
     gameState.isGameOver = false;
-    gameState.isGameWon = false; // SYSTEM RESET: Lower the victory flag configuration
+    gameState.isGameWon = false; 
     gameState.isPaused = false;
     gameState.enemyKillScore = 0;
     gameState.pigsSaved = 0;
     gameState.chickensSaved = 0;
     gameState.seedInventory = 0;
-    gameState.rocketFuel = 0; // SYSTEM RESET: Resets rocket fuel back to 0 points
+    gameState.rocketFuel = 0; 
     gameState.ammo = 0;
     gameState.hasGun = false;
     gameState.gunCoolDownActive = false;
@@ -142,7 +144,7 @@ export function resetGameSession() {
     gameState.activeGrenades = [];
     gameState.carryingGrenade = false;
     gameState.guns = [];
-    gameState.enemyLasers = []; // 🎯 Clean projectile arrays out safely
+    gameState.enemyLasers = []; 
 
     if (gameState.playerRole === 'alien-master') {
         dispatchMasterVesselSpawn();
@@ -209,19 +211,15 @@ function gameLoop() {
     } else {
         player.update();
 
-        // 🎯 INVERTED DIRECTIONAL FLIP FOR THE FARMER
+        // 🎯 FARMER ORIENTATION MATRIX MIRRORING REPAIR BLOCK
         ctx.save();
-
-        // Swapped from (!player.facingRight) to explicitly mirror when he IS facing right instead
         if (player.facingRight) {
-            // Translate to the center of the player, flip the X-axis, and translate back
             ctx.translate(player.x + 144, player.y + 144);
             ctx.scale(-1, 1);
             ctx.translate(-(player.x + 144), -(player.y + 144));
         }
-
         player.draw(ctx);
-        ctx.restore(); // Cleanly reset the canvas orientation matrix
+        ctx.restore(); 
     }
 
     // --- HOTBAR HUD SYSTEM ---
@@ -258,35 +256,29 @@ function gameLoop() {
     let currentFuel = gameState.rocketFuel || 0;
     let maxFuel = gameState.maxRocketFuel || 500;
     if (currentFuel >= maxFuel) {
-        gameState.isGameWon = true; // Raise the flag for input frameworks to read
+        gameState.isGameWon = true;
 
-        // Deep space blue semi-transparent backdrop overlay
         ctx.fillStyle = 'rgba(10, 25, 50, 0.92)';
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
         ctx.textAlign = 'center';
 
-        // Shiny gold victory font header
         ctx.fillStyle = '#ffd700'; ctx.font = 'bold 150px Arial';
         ctx.fillText('VICTORY ACHIEVED!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 150);
 
-        // Subtitle mission completion tag
         ctx.fillStyle = 'white'; ctx.font = '60px Arial';
         ctx.fillText('The Rocket is Fueled! You Escaped the Alien Horde!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
 
-        // Player performance stats layout metrics
         ctx.fillStyle = '#66ff66'; ctx.font = '50px Arial';
         ctx.fillText(`Aliens Neutralized: ${gameState.enemyKillScore}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70);
         ctx.fillText(`Pigs Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 140);
 
-        // Control layout instructions
         ctx.fillStyle = 'white'; ctx.font = '45px Arial';
         ctx.fillText('Press [ R ] to Play Again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
         ctx.fillStyle = '#00ffff';
         ctx.fillText('Press [ H ] for Home Start Menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 320);
 
         try { moveSound.pause(); } catch (e) { }
-        return; // 🛑 Stops everything behind it from updating
+        return;
     }
 
     // --- SHARED GAME OVER UI ---
@@ -322,13 +314,15 @@ function gameLoop() {
         }
     }
 
-    // --- ALIEN MASTER CONTROLLER TRACKING INTERCEPT ---
+    // --- ALIEN MASTER CONTROLLER TRACKING INTERCEPT (CLIENT PREDICTION IMPLEMENTATION) ---
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && gameState.peerConnection && gameState.peerConnection.open) {
         if (!gameState.isAlienDead) {
             let myDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
             if (myDrone) {
-                if (gameState.moveLeft) myDrone.x -= 7; if (gameState.moveRight) myDrone.x += 7;
-                if (gameState.moveUp) myDrone.y -= 7; if (gameState.moveDown) myDrone.y += 7;
+                // 🏎️ SNAPPY PREDICTION ENGINE: Process local commands instantly without echo network latencies
+                let manualMoveSpeed = 7; 
+                if (gameState.moveLeft) myDrone.x -= manualMoveSpeed; if (gameState.moveRight) myDrone.x += manualMoveSpeed;
+                if (gameState.moveUp) myDrone.y -= manualMoveSpeed; if (gameState.moveDown) myDrone.y += manualMoveSpeed;
 
                 myDrone.x = Math.max(0, Math.min(CANVAS_WIDTH - 288, myDrone.x));
                 myDrone.y = Math.max(0, Math.min(CANVAS_HEIGHT - 288, myDrone.y));
@@ -344,37 +338,29 @@ function gameLoop() {
             }
         }
     }
-
-    // =======================================================
-    // ⚔️ WEAPON GROUND COLLISION MULTIPLAYER RESOLUTION
-    // =======================================================
+    
+    // --- WEAPON GROUND COLLISION MANAGEMENT CONTAINER ---
     let gunToDestroy = null;
     gameState.guns.forEach((g) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 160, 160);
 
-        // 1. Check if the FARMER picks up the gun
         if (checkCollision(player, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
             gunToDestroy = g;
             seedPickupSound.play().catch(() => { });
             gameState.ammo = 100;
-            if (!gameState.inventory.includes('gun')) {
-                let emptySlot = gameState.inventory.indexOf(null);
-                if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun';
-            }
-            gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun');
-            gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
+            if (!gameState.inventory.includes('gun')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; }
+            gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
         }
-        // 2. Check if ANY living type-1 grunt grabs it (AI or Player Controlled)
         else {
             gameState.enemies.forEach((en) => {
                 if (en.type === 1 && !en.isDying && !en.hasGun) {
                     if (checkCollision(en, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
                         gunToDestroy = g;
-                        en.hasGun = true;
-                        en.pickupDone = false;
-                        en.fIdx = 0;
-                        en.fT = 0;
-                        en.speed += 1.2;
+                        en.hasGun = true;       
+                        en.pickupDone = false;   
+                        en.fIdx = 0;             
+                        en.fT = 0;               
+                        en.speed += 1.2;         
                         seedPickupSound.currentTime = 0;
                         seedPickupSound.play().catch(() => { });
                     }
@@ -383,7 +369,6 @@ function gameLoop() {
         }
     });
 
-    // Safely remove the gun from the map array after checking collisions
     if (gunToDestroy) {
         let destroyIdx = gameState.guns.indexOf(gunToDestroy);
         if (destroyIdx !== -1) gameState.guns.splice(destroyIdx, 1);
@@ -455,10 +440,13 @@ function gameLoop() {
 
             let isPlayerControlledDrone = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
 
+            // --- POSITION MANAGEMENT ENGINES WITH PREDICTION BYPASS CHECKS ---
             if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
-                if (en.targetX !== undefined && !isPlayerControlledDrone) {
-                    en.x += (en.targetX - en.x) * 0.18;
-                    en.y += (en.targetY - en.y) * 0.18;
+                if (isPlayerControlledDrone) {
+                    // prediction block loops manage this instance
+                } else if (en.targetX !== undefined) {
+                    en.x += (en.targetX - en.x) * 0.25; 
+                    en.y += (en.targetY - en.y) * 0.25;
                 }
             } else {
                 if (!isPlayerControlledDrone && !en.isLocallyControlled && gameState.playerRole === 'farmer') {
@@ -467,24 +455,24 @@ function gameLoop() {
                 }
             }
 
-            // 🎯 AI AUTONOMOUS LINEAR LASER PROJECTILE LOGIC (Single Player & Uncontrolled Grunts)
+            // 🎯 AI AUTONOMOUS LINEAR LASER ATTACK TRIGGER COOLDOWN
             if (en.hasGun && en.pickupDone && gameState.playerRole === 'farmer') {
                 if (!en.laserCooldown) en.laserCooldown = 0;
                 en.laserCooldown++;
 
-                if (en.laserCooldown >= 90 && dist < 900) {
+                if (en.laserCooldown >= 90 && dist < 900) { 
                     let angle = Math.atan2(dy, dx);
-                    let laserSpeed = 2;
+                    let laserSpeed = 4; // 📉 Velocity adjustments slowed to matching gameplay settings limits
 
                     gameState.enemyLasers.push({
-                        x: en.x + 144,
+                        x: en.x + 144, 
                         y: en.y + 144,
                         vX: Math.cos(angle) * laserSpeed,
                         vY: Math.sin(angle) * laserSpeed,
-                        width: 90,
+                        width: 90,     
                         height: 90
                     });
-                    en.laserCooldown = 0;
+                    en.laserCooldown = 0; 
                 }
             }
 
@@ -497,23 +485,19 @@ function gameLoop() {
                 }
             });
 
-            // 📐 DETAILED ANIMATION STATE FRAME TICK LIMIT ENGINE
             en.fT++;
             if (en.fT >= 10) {
                 if (en.hasGun) {
                     if (!en.pickupDone) {
-                        // Intro Step Sheet sequence (4 frames total: 0, 1, 2, 3)
                         en.fIdx++;
                         if (en.fIdx >= 4) {
-                            en.pickupDone = true; // 🏁 Intro is done! Swap states permanently
-                            en.fIdx = 0;          // Reset pointer index cleanly for the next asset file
+                            en.pickupDone = true; 
+                            en.fIdx = 0;          
                         }
                     } else {
-                        // Persistent loop sequence (6 frames total: 0 to 5)
                         en.fIdx = (en.fIdx + 1) % 6;
                     }
                 } else {
-                    // Baseline standard unarmed loop boundary triggers
                     en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : (en.type === 1 ? 3 : 2));
                 }
                 en.fT = 0;
@@ -537,53 +521,27 @@ function gameLoop() {
                 let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : 0;
 
                 if (en.hasGun) {
-                    // 📐 RENDERING LAYER: STATE A (Playing intro sequence pickup animation)
                     if (!en.pickupDone && poltraGetsGun.complete && poltraGetsGun.naturalWidth !== 0) {
                         let gunCol = trueFrame % 2;
                         let gunRow = Math.floor(trueFrame / 2);
-
-                        ctx.drawImage(
-                            poltraGetsGun,
-                            gunCol * 1764, gunRow * 1764,
-                            1764, 1764,
-                            en.x, en.y,
-                            288, 288
-                        );
-                    }
-                    // 📐 RENDERING LAYER: STATE B (Switching to the 1800x1640 loop layout sheet matrix)
+                        ctx.drawImage(poltraGetsGun, gunCol * 1764, gunRow * 1764, 1764, 1764, en.x, en.y, 288, 288);
+                    } 
                     else if (en.pickupDone && poltraWithGun.complete && poltraWithGun.naturalWidth !== 0) {
                         let loopCol = trueFrame % 2;
                         let loopRow = Math.floor(trueFrame / 2);
-
-                        ctx.drawImage(
-                            poltraWithGun,
-                            loopCol * 1800, loopRow * 1640,
-                            1800, 1640,
-                            en.x, en.y,
-                            288, 288
-                        );
+                        ctx.drawImage(poltraWithGun, loopCol * 1800, loopRow * 1640, 1800, 1640, en.x, en.y, 288, 288);
                     }
                 } else {
                     let spriteCol = trueFrame % 2;
                     let spriteRow = Math.floor(trueFrame / 2);
-
-                    ctx.drawImage(
-                        enemyImage,
-                        spriteCol * 288, spriteRow * 288,
-                        288, 288,
-                        en.x, en.y,
-                        288, 288
-                    );
+                    ctx.drawImage(enemyImage, spriteCol * 288, spriteRow * 288, 288, 288, en.x, en.y, 288, 288);
                 }
             }
 
-            // --- WEAPON DAMAGE CONTROLLER ---
             if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
                 let pDx = en.x - gameState.playerX;
                 if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0))) {
-
                     if (!en.lastHitTime) en.lastHitTime = 0;
-
                     if (Date.now() - en.lastHitTime > 380) {
                         let baseMax = (isPlayerControlledDrone) ? 50 : 10;
                         if (en.health === undefined) en.health = baseMax;
@@ -591,44 +549,29 @@ function gameLoop() {
                         let bulletDamage = 0.25;
                         en.health -= bulletDamage;
                         en.lastHitTime = Date.now();
-
                         createDamageNumber(en.x + 144, en.y, bulletDamage, false);
 
                         if (en.health <= 0) {
-                            en.isDying = true;
-                            en.deathFrame = 0;
-                            en.deathTimer = 0;
-                            gameState.enemyKillScore++;
+                            en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++;
                         }
                     }
                 }
             }
 
-            // --- UNIVERSAL ALIEN PLAYER HEALTH BAR OVERLAY ---
             if (gameState.isMultiplayer && en.id === gameState.controlledEnemyId) {
                 let maxAlienHP = 50;
                 let currentHP = en.health !== undefined ? en.health : maxAlienHP;
 
-                let barWidth = 140;
-                let barHeight = 12;
-
+                let barWidth = 140; let barHeight = 12;
                 let spriteRenderWidth = (en.type === 3) ? 300 : 288;
-                let barX = en.x + (spriteRenderWidth / 2) - (barWidth / 2);
-                let barY = en.y - 20;
+                let barX = en.x + (spriteRenderWidth / 2) - (barWidth / 2); let barY = en.y - 20;
 
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-                ctx.fillRect(barX, barY, barWidth, barHeight);
-
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'; ctx.fillRect(barX, barY, barWidth, barHeight);
                 let hpPercentage = Math.max(0, Math.min(1, currentHP / maxAlienHP));
-                ctx.fillStyle = hpPercentage > 0.4 ? '#00ffff' : '#ff3333';
-                ctx.fillRect(barX + 2, barY + 2, (barWidth - 4) * hpPercentage, barHeight - 4);
-
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(barX, barY, barWidth, barHeight);
+                ctx.fillStyle = hpPercentage > 0.4 ? '#00ffff' : '#ff3333'; ctx.fillRect(barX + 2, barY + 2, (barWidth - 4) * hpPercentage, barHeight - 4);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.strokeRect(barX, barY, barWidth, barHeight);
             }
 
-            // COLLISION RESOLUTION: Executed solely on Host Machine
             if (checkCollision(player, en) && gameState.playerRole === 'farmer') {
                 if (gameState.isPowered) {
                     en.health = 0; en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++;
@@ -649,28 +592,21 @@ function gameLoop() {
     if (!gameState.enemyLasers) gameState.enemyLasers = [];
     for (let l = gameState.enemyLasers.length - 1; l >= 0; l--) {
         let laser = gameState.enemyLasers[l];
-
-        // 🚀 Only update projectile positions linearly if you are the host (Farmer)
-        // Client (Alien Master) positions are updated directly by incoming network sync packets
+        
+        // Only host calculates standard trajectory displacements
         if (gameState.playerRole === 'farmer') {
             laser.x += laser.vX;
             laser.y += laser.vY;
         }
 
-        // 🎯 UNIVERSAL RENDERING LAYER: Runs on BOTH screens perfectly
+        // UNIVERSAL RENDERING STAGE: Displays on both screens
         if (laserBullet.complete && laserBullet.naturalWidth !== 0) {
-            ctx.drawImage(
-                laserBullet,
-                0, 0, 448, 448,
-                laser.x - 45, laser.y - 45,
-                laser.width || 90, laser.height || 90
-            );
+            ctx.drawImage(laserBullet, 0, 0, 448, 448, laser.x - 45, laser.y - 45, laser.width || 90, laser.height || 90);
         } else {
             ctx.fillStyle = '#ff00ff';
             ctx.fillRect(laser.x - 10, laser.y - 10, 20, 20);
         }
 
-        // Farmer collision hitbox intercept tracking (Authoritative Host Only)
         if (gameState.playerRole === 'farmer') {
             let hitTarget = { x: laser.x - 20, y: laser.y - 20, width: 40, height: 40 };
             if (checkCollision(player, hitTarget, true)) {
@@ -682,12 +618,12 @@ function gameLoop() {
                 break;
             }
 
-            // Boundary map check cleanup loop to prevent memory leaks
             if (laser.x < -500 || laser.x > 3000 || laser.y < -500 || laser.y > 3000) {
                 gameState.enemyLasers.splice(l, 1);
             }
         }
     }
+
     // --- ANIMALS & CHARMS LAYER ---
     gameState.pigs.forEach((pig) => {
         if (pig === gameState.carryingPig) { pig.x = gameState.playerX + 50; pig.y = gameState.playerY + 50; }
@@ -752,7 +688,7 @@ function gameLoop() {
 
             gameState.rocketFuel = (gameState.rocketFuel || 0) + 50;
             if (gameState.rocketFuel > gameState.maxRocketFuel) {
-                gameState.rocketFuel = gameState.maxRocketFuel;
+                gameState.rocketFuel = gameState.maxRocketFuel; 
             }
 
             let target = gameState.enemies.find(e => !e.isDying);
@@ -860,7 +796,7 @@ function gameLoop() {
         ctx.fillStyle = durPct > 0.35 ? '#00bfff' : '#FFaa00'; ctx.fillRect(210, 185, 200 * durPct, 30);
     }
 
-    // 🎯 THROTTLED NETWORK EMISSION PANEL (gameFrame % 6 BREATHING ROOM ADJUSTMENT)
+    // 🎯 NETWORK EMISSION PACKET BUFFER MANAGER (THROTTLED AT % 6 FOR SYSTEM STABILITY)
     if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.peerConnection.open && gameState.gameFrame % 6 === 0) {
         try {
             gameState.peerConnection.send({
@@ -872,8 +808,6 @@ function gameLoop() {
                     type: parseInt(en.type) || 1,
                     isDying: en.isDying ? true : false,
                     health: en.health,
-
-                    // 🛸 TRANSMIT THE GUN VALUES OVER THE DATA LANE SO CLIENT OVERWRITES LOCAL DATA
                     hasGun: en.hasGun ? true : false,
                     pickupDone: en.pickupDone ? true : false
                 }))
@@ -895,12 +829,12 @@ function gameLoop() {
                 activeGrenades: gameState.activeGrenades.map(ag => ({ x: ag.x, y: ag.y, exploded: ag.exploded })),
                 carryingGrenade: gameState.carryingGrenade ? true : false,
                 guns: gameState.guns.map(gu => ({ x: gu.x, y: gu.y })),
-                enemyLasers: gameState.enemyLasers.map(l => ({ x: Math.round(l.x), y: Math.round(l.y), width: l.width, height: l.height })),
+                enemyLasers: gameState.enemyLasers.map(l => ({ x: Math.round(l.x), y: Math.round(l.y), width: l.width, height: l.height })), 
                 activeSlot: parseInt(gameState.activeSlot) || 0,
                 inventory: gameState.inventory,
                 hasScythe: gameState.hasScythe,
                 hasGun: gameState.hasGun,
-                rocketFuel: gameState.rocketFuel
+                rocketFuel: gameState.rocketFuel 
             });
         } catch (e) { }
     }

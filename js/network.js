@@ -44,8 +44,11 @@ function setupConnection(conn) {
                     masterAlien.y = 1250;
                     masterAlien.speed = 0; 
                     masterAlien.isLocallyControlled = true; 
-                    masterAlien.hasGun = false;       // Match initial main factory setups
+                    
+                    // Born completely unarmed on reset match launch states
+                    masterAlien.hasGun = false;       
                     masterAlien.pickupDone = false;
+                    
                     gameState.enemies.push(masterAlien);
                 }
             }
@@ -68,7 +71,7 @@ function setupConnection(conn) {
                 }
             }
 
-            // 🎯 NEW: Process manual gun firing instructions sent across link by client pilot click
+            // Process manual weapon triggers fired from the client player side clicking inputs
             if (data.type === 'ALIEN_MANUAL_FIRE') {
                 let shooter = gameState.enemies.find(e => e.id === data.id);
                 if (shooter && !shooter.isDying) {
@@ -77,7 +80,7 @@ function setupConnection(conn) {
                         let dx = data.tx - shooter.x;
                         let dy = data.ty - shooter.y;
                         let angle = Math.atan2(dy, dx);
-                        let laserSpeed = 2; 
+                        let laserSpeed = 5; // 📉 Slowed down velocity clamp matching gameplay balances
 
                         if (!gameState.enemyLasers) gameState.enemyLasers = [];
                         gameState.enemyLasers.push({
@@ -102,9 +105,12 @@ function setupConnection(conn) {
                 let uncontrolledAlien = createEnemy(chosenType);
                 
                 if (uncontrolledAlien) {
+                    // 🎯 UNIQUE ID STAMPER GENERATOR FIX: Stops background warping/snapping glitches!
+                    uncontrolledAlien.id = `stolen-seed-spawn-${Math.floor(Math.random() * 9999999)}`;
                     uncontrolledAlien.isLocallyControlled = false; 
+                    
                     gameState.enemies.push(uncontrolledAlien);
-                    console.log(`📡 SEED STOLEN: Uncontrolled Level ${chosenType} deployed.`);
+                    console.log(`📡 SEED STOLEN: Deployed Unique Level ${chosenType} Grunt (ID: ${uncontrolledAlien.id})`);
                 }
             }
 
@@ -144,8 +150,6 @@ function setupConnection(conn) {
                             health: ne.health,
                             width: 288,
                             height: 288,
-                            
-                            // 🎯 UNPACK WEAPON CAPABILITY ON FIRST GENERATION TICK
                             hasGun: ne.hasGun ? true : false,
                             pickupDone: ne.pickupDone ? true : false
                         };
@@ -154,8 +158,6 @@ function setupConnection(conn) {
                         localEn.targetX = ne.x;
                         localEn.targetY = ne.y;
                         localEn.isDying = ne.isDying;
-                        
-                        // 🎯 RE-SYNC RUNTIME MODIFIERS EVERY TICK LOOP 
                         localEn.hasGun = ne.hasGun ? true : false;
                         localEn.pickupDone = ne.pickupDone ? true : false;
                     }
@@ -181,7 +183,7 @@ function setupConnection(conn) {
                 gameState.inventory = data.inventory;
                 gameState.hasScythe = data.hasScythe;
                 
-                // 🎯 RE-EXTRACT ACTIVE RED LINEAR LASERS STREAM PACKETS HERE 
+                // Pull incoming synchronized lasers positions straight from the network packet channel
                 gameState.enemyLasers = data.enemyLasers || [];
                 
                 if (data.rocketFuel !== undefined) {
