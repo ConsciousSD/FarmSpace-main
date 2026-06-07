@@ -194,9 +194,11 @@ function gameLoop() {
         ctx.drawImage(grenadeSprite, g.x - pulse, g.y - pulse, 160 + pulse * 2, 160 + pulse * 2);
     });
 
-    // --- PLAYER DRAW LAYER ---
+    // =======================================================
+    // 👩‍🌾 UNIVERSAL PLAYER DRAW LAYER
+    // =======================================================
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
-        // Smooth out incoming player positions
+        // 🛸 ALIEN MASTER CLIENT PERSPECTIVE (YOU)
         if (gameState.targetPlayerX !== undefined) {
             gameState.playerX += (gameState.targetPlayerX - gameState.playerX) * 0.22;
             gameState.playerY += (gameState.targetPlayerY - gameState.playerY) * 0.22;
@@ -207,39 +209,37 @@ function gameLoop() {
         if (gameState.moveLeft) player.facingRight = false;
         if (gameState.moveRight) player.facingRight = true;
 
-        // 🎯 FIX: Check if the farmer is currently in Powered Tractor Mode!
+        // Check if the host is transformed into tractor mode
         if (gameState.isPowered) {
             ctx.save();
-            // Translate to center point of the footprint
             ctx.translate(player.x + 144, player.y + 144);
-
-            // Mirror horizontally if facing left/right matches your asset direction
             if (player.facingRight) ctx.scale(-1, 1);
 
-            // Draw the tireSprite or tractor vehicle asset directly onto your screen!
             if (tireSprite.complete && tireSprite.naturalWidth !== 0) {
-                // If you have a separate tractor image asset, swap 'tireSprite' with that asset name!
                 ctx.drawImage(tireSprite, 0, 0, 300, 300, -144, -144, 288, 288);
             } else {
-                // Bright gold box fallback so you know the mode is active
                 ctx.fillStyle = '#ffcc00';
                 ctx.fillRect(-100, -100, 200, 200);
             }
             ctx.restore();
         } else {
-            // Otherwise, draw the regular farmer skin
+            // Draw regular farmer silhouette structure
             player.draw(ctx);
         }
     } else {
-        // Authoritative Host Farmer Drawing Loop
+        // 👩‍🌾 AUTHORITATIVE HOST FARMER ENGINE (YOUR WIFE)
         player.update();
 
-        ctx.save();
-        ctx.translate(player.x + 144, player.y + 144);
-        if (player.facingRight) {
-            ctx.scale(-1, 1);
-        }
+        // Let the original player object draw itself safely at its true positions first
         player.draw(ctx);
+
+        // Then intercept and apply directional flips ONLY if she is changing directions
+        ctx.save();
+        if (player.facingRight) {
+            ctx.translate(player.x + 144, player.y + 144);
+            ctx.scale(-1, 1);
+            ctx.translate(-(player.x + 144), -(player.y + 144));
+        }
         ctx.restore();
     }
 
