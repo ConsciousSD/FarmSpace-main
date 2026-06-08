@@ -206,41 +206,17 @@ function gameLoop() {
         player.x = gameState.playerX;
         player.y = gameState.playerY;
 
+        // 🎯 FIX: Let the client master state drive the player instance directions smoothly
         if (gameState.moveLeft) player.facingRight = false;
         if (gameState.moveRight) player.facingRight = true;
 
-        // Check if the host is transformed into tractor mode
-        if (gameState.isPowered) {
-            ctx.save();
-            ctx.translate(player.x + 144, player.y + 144);
-            if (player.facingRight) ctx.scale(-1, 1);
-
-            if (tireSprite.complete && tireSprite.naturalWidth !== 0) {
-                ctx.drawImage(tireSprite, 0, 0, 300, 300, -144, -144, 288, 288);
-            } else {
-                ctx.fillStyle = '#ffcc00';
-                ctx.fillRect(-100, -100, 200, 200);
-            }
-            ctx.restore();
-        } else {
-            // Draw regular farmer silhouette structure
-            player.draw(ctx);
-        }
+        player.draw(ctx);
     } else {
         // 👩‍🌾 AUTHORITATIVE HOST FARMER ENGINE (YOUR WIFE)
         player.update();
 
-        // Let the original player object draw itself safely at its true positions first
+        // 🎯 FIX: Just call draw cleanly! No more old canvas matrices fighting the new player.js code
         player.draw(ctx);
-
-        // Then intercept and apply directional flips ONLY if she is changing directions
-        ctx.save();
-        if (player.facingRight) {
-            ctx.translate(player.x + 144, player.y + 144);
-            ctx.scale(-1, 1);
-            ctx.translate(-(player.x + 144), -(player.y + 144));
-        }
-        ctx.restore();
     }
 
     // --- HOTBAR HUD SYSTEM ---
