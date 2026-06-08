@@ -625,51 +625,69 @@ function startTrackingIntervals() {
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && !gameState.hasScythe && gameState.scythes.length < 1) gameState.scythes.push({ x: Math.random() * 2000 + 100, y: Math.random() * 2000 + 100 }); }, 30000));
 }
 
-const startButton = document.getElementById('start-button');
-const startScreen = document.getElementById('start-screen');
-const hostFarmerBtn = document.getElementById('host-farmer-btn');
-const joinMasterBtn = document.getElementById('join-master-btn');
-const roomCodeInput = document.getElementById('room-code-input');
+// --- DOM SAFE INITIALIZATION WRAPPER ---
+document.addEventListener('DOMContentLoaded', () => {
+    const startButton = document.getElementById('start-button');
+    const startScreen = document.getElementById('start-screen');
+    const hostFarmerBtn = document.getElementById('host-farmer-btn');
+    const joinMasterBtn = document.getElementById('join-master-btn');
+    const roomCodeInput = document.getElementById('room-code-input');
 
-function startGame() {
-    if (startScreen.style.display === 'none') return;
-    startScreen.style.display = 'none';
-    gameAudio.play().catch(e => console.log("Audio blocked"));
-    initInput(); spawnTick();
-    gameState.inventory[0] = 'scythe'; gameState.hasScythe = true;
-    startTrackingIntervals();
-    gameLoop();
-}
-
-startButton.addEventListener('click', startGame);
-hostFarmerBtn.addEventListener('click', () => {
-    const roomCode = roomCodeInput.value.trim().toLowerCase();
-    if (!roomCode) return alert("Please enter a room code first!");
-    initMultiplayer('farmer', roomCode);
-    startGame();
-});
-joinMasterBtn.addEventListener('click', () => {
-    const roomCode = roomCodeInput.value.trim().toLowerCase();
-    if (!roomCode) return alert("Please enter a room code first!");
-    initMultiplayer('alien-master', roomCode);
-    startScreen.style.display = 'none';
-    initInput();
-    gameLoop();
-    dispatchMasterVesselSpawn();
-});
-
-window.addEventListener('keydown', e => {
-    if (e.key === 'Enter') startGame();
-    if (e.key === 'r' || e.key === 'R' || e.keyCode === 82) {
-        if (gameState.isGameOver || gameState.isGameWon) {
-            console.log("🎯 R Key registered cleanly.");
-            if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-            if (gameState.isMultiplayer && gameState.peerConnection && gameState.peerConnection.open) {
-                try { gameState.peerConnection.send({ type: 'REMOTE_SOFT_RESET' }); } catch (err) { }
-            }
-            resetGameSession();
-        }
+    // Define startGame inside the DOM wrapper so it has perfect access to everything
+    function startGame() {
+        if (!startScreen || startScreen.style.display === 'none') return;
+        startScreen.style.display = 'none';
+        gameAudio.play().catch(e => console.log("Audio blocked"));
+        initInput();
+        spawnTick();
+        gameState.inventory[0] = 'scythe';
+        gameState.hasScythe = true;
+        startTrackingIntervals();
+        gameLoop();
     }
+
+    if (startButton) {
+        startButton.addEventListener('click', startGame);
+    }
+
+    if (hostFarmerBtn && roomCodeInput) {
+        hostFarmerBtn.addEventListener('click', () => {
+            const roomCode = roomCodeInput.value.trim().toLowerCase();
+            if (!roomCode) return alert("Please enter a room code first!");
+            initMultiplayer('farmer', roomCode);
+            startGame();
+        });
+    }
+
+    if (joinMasterBtn && roomCodeInput) {
+        joinMasterBtn.addEventListener('click', () => {
+            const roomCode = roomCodeInput.value.trim().toLowerCase();
+            if (!roomCode) return alert("Please enter a room code first!");
+            initMultiplayer('alien-master', roomCode);
+            if (startScreen) startScreen.style.display = 'none';
+            initInput();
+            gameLoop();
+            dispatchMasterVesselSpawn();
+        });
+    }
+
+    // Set up the universal keyboard hooks
+    window.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            startGame();
+        }
+        if (e.key === 'r' || e.key === 'R' || e.keyCode === 82) {
+            if (gameState.isGameOver || gameState.isGameWon) {
+                console.log("🎯 R Key registered cleanly.");
+                if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+                if (gameState.isMultiplayer && gameState.peerConnection && gameState.peerConnection.open) {
+                    try { gameState.peerConnection.send({ type: 'REMOTE_SOFT_RESET' }); } catch (err) { }
+                }
+                resetGameSession();
+            }
+        }
+    });
 });
 
+// Initialize global inputs
 initInput();
