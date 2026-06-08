@@ -4,7 +4,8 @@ import { checkCollision } from './helpers.js';
 import { 
     enemySprite, enemySprite2, enemySprite3, 
     enemyDeathSprite, enemyDeathSprite2,
-    poltra_gets_gun, poltra_with_gun // 🎯 Direct explicit module imports
+    poltra_gets_gun, poltra_with_gun,
+    lazer_bullet // 🎯 Direct module import for laser ammo asset
 } from './assets.js';
 
 // 📋 Global configurations for your balancing workflows
@@ -47,8 +48,11 @@ export function createEnemyData(type) {
         deathFrame: 0,
         deathTimer: 0,
         lastHitTime: 0,
-        // 🎯 WEAPON FLAGS
+        // 🎯 WEAPON & ATTACK FLAGS
         hasGun: false,
+        isTransforming: false,
+        transformFrame: 0,
+        transformTimer: 0,
         pickupDone: false,
         shootCooldown: 0
     };
@@ -98,8 +102,11 @@ export function updateAndDrawEnemies(createDamageNumber) {
             }
         } else {
             if (!isPlayerControlledDrone && !en.isLocallyControlled && gameState.playerRole === 'farmer') {
-                en.x += (dx / dist) * en.speed * moveDir;
-                en.y += (dy / dist) * en.speed * moveDir;
+                // Freeze coordinates only while mid-transformation state plays
+                if (!en.isTransforming) {
+                    en.x += (dx / dist) * en.speed * moveDir;
+                    en.y += (dy / dist) * en.speed * moveDir;
+                }
             }
         }
 
@@ -158,57 +165,155 @@ export function updateAndDrawEnemies(createDamageNumber) {
                 let pDist = Math.hypot(pDx, pDy);
 
                 if (pDist < 800 && gameState.enemyLasers) {
+                    let angle = Math.atan2(pDy, pDx);
+
                     gameState.enemyLasers.push({
                         x: en.x + 144,
                         y: en.y + 144,
                         vx: (pDx / pDist) * 8, 
                         vy: (pDy / pDist) * 8,
-                        width: 40,
-                        height: 40
+                        width: 96,   
+                        height: 96,
+                        angle: angle,
+                        fIdx: 0,     
+                        fT: 0        
                     });
                 }
                 en.shootCooldown = 0;
             }
         }
 
-        // --- ANIMATION FRAME TICKER ---
+        // =======================================================
+        // 🔄 ANIMATION STATE ENGINE & PATHFINDING OVERRIDES
+        // =======================================================
         en.fT++;
-        if (en.fT >= 10) {
+        
+        if (en.hasGun && en.isTransforming) {
+            en.speed = 0; 
+
+            // 🎯 Play 4-frame transformation (2x2 Grid)
+            if (en.fT >= 12) { 
+                en.transformFrame = (en.transformFrame || 0) + 1;
+                en.fT = 0;
+
+                if (en.transformFrame > 3) {
+                    en.isTransforming = false;
+                    en.pickupDone = true;
+                    en.fIdx = 0;
+                    en.speed = (ENEMY_CONFIGS[1].speed) + 1.2; 
+                }
+            }
+        } else if (en.fT >= 10) {
             let maxFrames = config.maxFrames;
-            if (en.type === 1 && en.hasGun && !en.pickupDone) maxFrames = 5;
+            
+            // 🎯 LOCKED FRAME CLIP: Limits loops to the 4 real visual artwork frames
+            if (en.type === 1 && en.hasGun && en.pickupDone) maxFrames = 4; 
             
             en.fIdx = (en.fIdx + 1) % maxFrames;
             en.fT = 0;
-            
-            if (en.type === 1 && en.hasGun && !en.pickupDone && en.fIdx === 0) {
-                en.pickupDone = true;
-            }
         }
 
-        // --- RENDER CURRENT ALIEN UNIT ---
+        // =======================================================
+        // 🎨 GRID CORNER RENDERING SYSTEM
+        // =======================================================
         if (en.type === 2) {
             ctx.drawImage(config.sprite, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
         } else if (en.type === 3) {
             ctx.drawImage(config.sprite, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
         } else {
+            // --- TYPE 1: DRONE / POLTRA ---
             if (en.hasGun) {
                 if (poltraGetsGunSprite === enemySprite || poltraWithGunSprite === enemySprite) {
-                    // Safety Fallback (Render normal drone sheet grid if images ever drop out)
-                    let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : (Math.floor(gameState.gameFrame / 10) % 3);
+                    let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : 0;
                     ctx.drawImage(enemySprite, (trueFrame % 2) * 288, Math.floor(trueFrame / 2) * 288, 288, 288, en.x, en.y, 288, 288);
                 } else {
-                    if (!en.pickupDone) {
-                        // 🎯 WORKING HORIZONTAL STRIP MATH FOR GETS GUN (Row Y = 0)
-                        ctx.drawImage(poltraGetsGunSprite, en.fIdx * 288, 0, 288, 288, en.x, en.y, 288, 288);
+                    // 🎯 UNIFORM CANVAS DISPLAY SCALE BOUNDS
+                    let drawWidth = 432;  
+                    let drawHeight = 432; 
+                    
+                    let offsetX = en.x - (drawWidth - en.width) / 2;
+                    let offsetY = en.y - (drawHeight - en.height) / 2;
+
+                    if (en.isTransforming) {
+                        // 🎯 SLICE 2x2 GRID: poltra_gets_gun.png (1728 x 1728 frames)
+                        let currentFrame = en.transformFrame || 0;
+                        let col = currentFrame % 2;
+                        let row = Math.floor(currentFrame / 2);
+                        
+                        ctx.drawImage(
+                            poltraGetsGunSprite,
+                            col * 1728, row * 1728, 1728, 1728, 
+                            offsetX, offsetY, drawWidth, drawHeight 
+                        );
                     } else {
-                        // 🎯 WORKING HORIZONTAL STRIP MATH FOR HAS GUN (Row Y = 0)
-                        let gunFrame = Math.floor(gameState.gameFrame / 10) % 3;
-                        ctx.drawImage(poltraWithGunSprite, gunFrame * 288, 0, 288, 288, en.x, en.y, 288, 288);
+                        // 🎯 FIXED SQUARE MATH SLICE: poltra_with_gun.png
+                        // Slices exact 1728x1728 grid cells, snapping the head onto the body cleanly!
+                        let col = en.fIdx % 2;
+                        let row = Math.floor(en.fIdx / 2);
+
+                        ctx.drawImage(
+                            poltraWithGunSprite,
+                            col * 1728, row * 1728, 1728, 1728, // 🎯 Changed 1152 to 1728 square dimensions
+                            offsetX, offsetY, drawWidth, drawHeight 
+                        );
                     }
                 }
             } else {
-                let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : (Math.floor(gameState.gameFrame / 10) % 3);
+                let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : 0;
                 ctx.drawImage(config.sprite, (trueFrame % 2) * 288, Math.floor(trueFrame / 2) * 288, 288, 288, en.x, en.y, 288, 288);
+            }
+        }
+    }
+
+    // =======================================================
+    // 🎯 PROCESS & RENDER ACTIVE LASER PROJECTILES
+    // =======================================================
+    if (gameState.enemyLasers) {
+        for (let lIdx = gameState.enemyLasers.length - 1; lIdx >= 0; lIdx--) {
+            let laser = gameState.enemyLasers[lIdx];
+            if (!laser) continue;
+            
+            laser.x += laser.vx;
+            laser.y += laser.vy;
+
+            laser.fT++;
+            if (laser.fT >= 6) {
+                laser.fIdx = (laser.fIdx + 1) % 4; 
+                laser.fT = 0;
+            }
+
+            if (laser.x < -200 || laser.x > CANVAS_WIDTH + 200 || laser.y < -200 || laser.y > CANVAS_HEIGHT + 200) {
+                gameState.enemyLasers.splice(lIdx, 1);
+                continue;
+            }
+
+            ctx.save();
+            ctx.translate(laser.x, laser.y);
+            ctx.rotate(laser.angle);
+            
+            if (typeof lazer_bullet !== 'undefined' && lazer_bullet.complete) {
+                let frameWidth = lazer_bullet.width / 4 || 128; 
+                ctx.drawImage(
+                    lazer_bullet,
+                    laser.fIdx * frameWidth, 0, frameWidth, lazer_bullet.height, 
+                    -laser.width / 2, -laser.height / 2, laser.width, laser.height 
+                );
+            } else {
+                ctx.fillStyle = '#ff0055';
+                ctx.fillRect(-laser.width / 2, -laser.height / 2, laser.width, laser.height);
+            }
+            ctx.restore();
+
+            // --- FARMER DAMAGE COLLISION PASS ---
+            if (checkCollision(player, { x: laser.x - 16, y: laser.y - 16, width: 32, height: 32 }, true)) {
+                if (!gameState.isInvincible && !gameState.isGameOver) {
+                    gameState.playerHealth--;
+                    gameState.isInvincible = true;
+                    gameState.invincibilityTimer = Date.now() + 1000;
+                    createDamageNumber(player.x + 144, player.y, "HIT!", true);
+                    
+                    gameState.enemyLasers.splice(lIdx, 1);
+                }
             }
         }
     }

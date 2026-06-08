@@ -325,10 +325,16 @@ function gameLoop() {
                     if (checkCollision(en, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
                         gunToDestroy = g;
                         en.hasGun = true;
-                        en.pickupDone = false;
-                        en.fIdx = 0;
-                        en.fT = 0;
-                        en.speed += 1.2;
+
+                        // 🎯 TRIGGER NEW TRANSFORMATION STATE
+                        en.isTransforming = true;
+                        en.transformFrame = 0;
+                        en.transformTimer = 0;
+
+                        // Freeze them in place during the pickup animation sequence
+                        en.savedBaseSpeed = en.speed || 2.0;
+                        en.speed = 0;
+
                         seedPickupSound.currentTime = 0;
                         seedPickupSound.play().catch(() => { });
                     }
