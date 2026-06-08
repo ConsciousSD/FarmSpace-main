@@ -15,5 +15,8 @@
     "url": "https://github.com/ConsciousSD/FarmSpace-main/issues"
   },
   "homepage": "https://github.com/ConsciousSD/FarmSpace-main#readme",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "electron": "^41.7.1"
+  }
 }
