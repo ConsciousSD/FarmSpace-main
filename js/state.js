@@ -13,23 +13,30 @@ export const gameState = {
     hasGun: false, gunCoolDownActive: false, killsSinceEmpty: 0,
     isPowered: false, powerTimer: 0, isPaused: false, isGameOver: false,
     
+    // --- ❤️ FARMER HEALTH SYSTEM ---
+    playerHealth: 3,                             // The active structural life point counter
+    maxPlayerHealth: 3,                          // Baseline scale cap ceiling for hearts panel
+    isInvincible: false,                         // Safety switch to prevent single-frame death loops
+    invincibilityTimer: 0,                       // Timestamp tracking window for hit tracking cooldowns
+
     // --- SPACE ROCKET FUEL MECHANICS ---
-    rocketFuel: 0,                              // Current accumulated engine fuel points
+    rocketFuel: 0,                               // Current accumulated engine fuel points
     maxRocketFuel: 500, 
-    isGameWon: false,                        // Peak storage container threshold cap
+    isGameWon: false,                            // Peak storage container threshold cap
 
     // --- WEAPONS, PLOWING & HOTBAR SYSTEM ---
     hasScythe: false, 
     plowedPatches: [], 
     scythes: [],
-    inventory: [null, null, null, null, null], // Slots 0-4 mapping to Hotkeys 1-5
-    activeSlot: 0,                             // The currently selected index
-    scytheDurability: 3,                       // Swings remaining on current tool
-    maxScytheDurability: 3,                    // Total baseline maximum capacity
+    inventory: [null, null, null, null, null],   // Slots 0-4 mapping to Hotkeys 1-5
+    activeSlot: 0,                               // The currently selected index
+    scytheDurability: 3,                         // Swings remaining on current tool
+    maxScytheDurability: 3,                      // Total baseline maximum capacity
 
     // --- ANIMALS & COLLECTIBLES ---
     pigs: [], carryingPig: null, pigsSaved: 0, lastPigSoundTime: 0,
     chickens: [], carryingChicken: null, chickensSaved: 0,
+    spaceCows: [], carryingSpaceCow: null, spaceCowsSaved: 0,
     charms: [],
     
     // --- MAP OBJECTS & THROWABLES ---
@@ -38,12 +45,12 @@ export const gameState = {
     
     // --- LOCAL MULTIPLAYER SYSTEM ---
     isMultiplayer: false,
-    playerRole: 'farmer',                      // Can be 'farmer' or 'alien-master'
-    connectionId: null,                        // Room code string to link browsers
-    peerConnection: null,                      // Direct network communication channel object
-    spawnCooldown: 0,                          // Interval counter to stagger alien drops
-    alienMasterSeeds: 0,                       // Stolen seed count to spend on spawns
-    controlledEnemyId: null,                   // Network ID of the currently possessed alien
+    playerRole: 'farmer',                        // Can be 'farmer' or 'alien-master'
+    connectionId: null,                          // Room code string to link browsers
+    peerConnection: null,                        // Direct network communication channel object
+    spawnCooldown: 0,                            // Interval counter to stagger alien drops
+    alienMasterSeeds: 0,                         // Stolen seed count to spend on spawns
+    controlledEnemyId: null,                     // Network ID of the currently possessed alien
 
     // --- PERSISTENT STATE DATA ---
     highScore: localStorage.getItem('farmSpaceHighScore') || 0,

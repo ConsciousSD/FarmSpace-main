@@ -1,10 +1,13 @@
 import { gameState, ctx, CANVAS_WIDTH, CANVAS_HEIGHT } from './state.js';
 import { initInput } from './input.js';
 import { player } from './player.js';
-import { checkCollision, createEnemy, triggerGameOver } from './helpers.js';
-import { gameAudio, moveSound, shootSound, seedPickupSound, grenadeExplosionSound, tirePickupSound, watermelonPickupSound, pigWalkSound } from './audio.js';
-import { enemySprite, enemySprite2, enemySprite3, corralSprite, grenadeSprite, scytheSprite, seedSprite, tireSprite, ak47Idle, enemyDeathSprite, enemyDeathSprite2, pigIdle, pigWalk, chickenSprite, watermelonSprite, charmSprite } from './assets.js';
+import { checkCollision, triggerGameOver } from './helpers.js';
+import { gameAudio, moveSound, shootSound, seedPickupSound, grenadeExplosionSound, tirePickupSound, watermelonPickupSound } from './audio.js';
+import { corralSprite, grenadeSprite, scytheSprite, seedSprite, tireSprite, ak47Idle, watermelonSprite, charmSprite } from './assets.js';
 import { initMultiplayer } from './network.js';
+// 🎯 MODULAR COMPONENTS INTERFACE IMPORTS
+import { updateAndDrawEnemies, createEnemyData } from './enemies.js';
+import { updateAndDrawAnimals } from './animals.js';
 
 // Global reference array to completely track and destroy intervals on reset
 let gameIntervals = [];
@@ -22,13 +25,13 @@ setInterval(() => {
 // Helper function to spin up a floating particle number over a target
 function createDamageNumber(x, y, amount, isCritical = false) {
     gameState.damageNumbers.push({
-        x: x + Math.random() * 60 - 30, 
+        x: x + Math.random() * 60 - 30,
         y: y - 10,
         text: amount,
         color: isCritical ? '#ffcc00' : '#00ffff',
         size: isCritical ? 38 : 28,
         alpha: 1.0,
-        vY: -2.5 - Math.random() * 1.5 
+        vY: -2.5 - Math.random() * 1.5
     });
 }
 
@@ -37,27 +40,22 @@ function drawRocketFuelBar() {
     const barWidth = 400;
     const barHeight = 26;
     const x = (CANVAS_WIDTH - barWidth) / 2;
-    const y = 125; // Sits neatly under hotbar slots container background
+    const y = 125;
 
-    // Background Panel
     ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     ctx.fillRect(x, y, barWidth, barHeight);
 
-    // Progression Clamp Math
     let currentFuel = gameState.rocketFuel || 0;
     let maxFuel = gameState.maxRocketFuel || 500;
     let fillPct = Math.max(0, Math.min(1, currentFuel / maxFuel));
 
-    // Fill Color: Rocket Fire Orange
-    ctx.fillStyle = '#ffaa00'; 
+    ctx.fillStyle = '#ffaa00';
     ctx.fillRect(x + 3, y + 3, (barWidth - 6) * fillPct, barHeight - 6);
 
-    // Frame Border Strokes
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, barWidth, barHeight);
 
-    // Centered Typography Text Data
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ffffff';
@@ -81,7 +79,7 @@ function dispatchMasterVesselSpawn() {
         fT: 0,
         width: 288,
         height: 288,
-        health: 50 // ADJUSTED: Enemy player health set to a 50 HP pool limit
+        health: 50
     });
 
     if (gameState.peerConnection && gameState.peerConnection.open) {
@@ -103,18 +101,22 @@ export function resetGameSession() {
     gameIntervals = [];
 
     gameState.isGameOver = false;
-    gameState.isGameWon = false; // SYSTEM RESET: Lower the victory flag configuration
+    gameState.isGameWon = false;
     gameState.isPaused = false;
     gameState.enemyKillScore = 0;
     gameState.pigsSaved = 0;
     gameState.chickensSaved = 0;
     gameState.seedInventory = 0;
-    gameState.rocketFuel = 0; // SYSTEM RESET: Resets rocket fuel back to 0 points
+    gameState.rocketFuel = 0;
     gameState.ammo = 0;
     gameState.hasGun = false;
     gameState.gunCoolDownActive = false;
     gameState.killsSinceEmpty = 0;
-    
+
+    gameState.playerHealth = 3;
+    gameState.isInvincible = false;
+    gameState.invincibilityTimer = 0;
+
     gameState.isAlienDead = false;
     gameState.alienRespawnTimer = 0;
 
@@ -129,12 +131,13 @@ export function resetGameSession() {
     gameState.scytheDurability = gameState.maxScytheDurability;
 
     gameState.enemies = [];
-    gameState.damageNumbers = []; 
+    gameState.damageNumbers = [];
     gameState.plowedPatches = [];
     gameState.plantedWatermelons = [];
     gameState.seeds = [];
     gameState.pigs = [];
     gameState.chickens = [];
+    gameState.spaceCows = [];
     gameState.charms = [];
     gameState.grenadesOnGround = [];
     gameState.activeGrenades = [];
@@ -152,7 +155,7 @@ export function resetGameSession() {
     }
 
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    gameLoop(); 
+    gameLoop();
 
     window.focus();
     console.log("LOBBY RETAINED: Soft session restart processed cleanly.");
@@ -160,6 +163,10 @@ export function resetGameSession() {
 
 function gameLoop() {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    if (gameState.isInvincible && Date.now() > gameState.invincibilityTimer) {
+        gameState.isInvincible = false;
+    }
 
     // --- BASE BACKGROUND LAYER ---
     ctx.drawImage(corralSprite, gameState.corral.x, gameState.corral.y, gameState.corral.width, gameState.corral.height);
@@ -242,35 +249,23 @@ function gameLoop() {
     let currentFuel = gameState.rocketFuel || 0;
     let maxFuel = gameState.maxRocketFuel || 500;
     if (currentFuel >= maxFuel) {
-        gameState.isGameWon = true; // Raise the flag for input frameworks to read
-        
-        // Deep space blue semi-transparent backdrop overlay
-        ctx.fillStyle = 'rgba(10, 25, 50, 0.92)'; 
+        gameState.isGameWon = true;
+        ctx.fillStyle = 'rgba(10, 25, 50, 0.92)';
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-        
-        ctx.textAlign = 'center'; 
-        
-        // Shiny gold victory font header
+        ctx.textAlign = 'center';
         ctx.fillStyle = '#ffd700'; ctx.font = 'bold 150px Arial';
         ctx.fillText('VICTORY ACHIEVED!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 150);
-        
-        // Subtitle mission completion tag
         ctx.fillStyle = 'white'; ctx.font = '60px Arial';
         ctx.fillText('The Rocket is Fueled! You Escaped the Alien Horde!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
-        
-        // Player performance stats layout metrics
         ctx.fillStyle = '#66ff66'; ctx.font = '50px Arial';
         ctx.fillText(`Aliens Neutralized: ${gameState.enemyKillScore}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70);
         ctx.fillText(`Pigs Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 140);
-
-        // Control layout instructions
         ctx.fillStyle = 'white'; ctx.font = '45px Arial';
         ctx.fillText('Press [ R ] to Play Again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
         ctx.fillStyle = '#00ffff';
         ctx.fillText('Press [ H ] for Home Start Menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 320);
-        
-        try { moveSound.pause(); } catch(e) {}
-        return; // 🛑 Stops everything behind it from updating
+        try { moveSound.pause(); } catch (e) { }
+        return;
     }
 
     // --- SHARED GAME OVER UI ---
@@ -280,13 +275,11 @@ function gameLoop() {
         ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 150);
         ctx.font = '70px Arial'; ctx.fillText(`Kills: ${gameState.enemyKillScore} (Best: ${gameState.highScore})`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
         ctx.fillStyle = '#66ff66'; ctx.fillText(`Pigs Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 100);
-
         ctx.fillStyle = 'white'; ctx.font = '50px Arial';
         ctx.fillText('Press [ R ] to Restart Session', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
         ctx.fillStyle = '#00ffff';
         ctx.fillText('Press [ H ] for Home Start Menu', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 320);
-        
-        try { moveSound.pause(); } catch(e) {}
+        try { moveSound.pause(); } catch (e) { }
         return;
     }
 
@@ -302,30 +295,7 @@ function gameLoop() {
         if (localIsMoving) {
             moveSound.play().catch(() => { });
         } else {
-            try { moveSound.pause(); } catch(e) {}
-        }
-    }
-
-    // --- ALIEN MASTER CONTROLLER TRACKING INTERCEPT ---
-    if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && gameState.peerConnection && gameState.peerConnection.open) {
-        if (!gameState.isAlienDead) {
-            let myDrone = gameState.enemies.find(e => e.id === gameState.controlledEnemyId);
-            if (myDrone) {
-                if (gameState.moveLeft) myDrone.x -= 7; if (gameState.moveRight) myDrone.x += 7;
-                if (gameState.moveUp) myDrone.y -= 7; if (gameState.moveDown) myDrone.y += 7;
-
-                myDrone.x = Math.max(0, Math.min(CANVAS_WIDTH - 288, myDrone.x));
-                myDrone.y = Math.max(0, Math.min(CANVAS_HEIGHT - 288, myDrone.y));
-
-                try {
-                    gameState.peerConnection.send({
-                        type: 'CONTROL_MOVE',
-                        id: gameState.controlledEnemyId,
-                        x: Math.round(myDrone.x),
-                        y: Math.round(myDrone.y)
-                    });
-                } catch(e) {}
-            }
+            try { moveSound.pause(); } catch (e) { }
         }
     }
 
@@ -333,8 +303,8 @@ function gameLoop() {
     gameState.guns.forEach((g, i) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 160, 160);
         if (checkCollision(player, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
-            gameState.guns.splice(i, 1); 
-            seedPickupSound.play().catch(() => {}); 
+            gameState.guns.splice(i, 1);
+            seedPickupSound.play().catch(() => { });
             gameState.ammo = 100;
             if (!gameState.inventory.includes('gun')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; }
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
@@ -342,27 +312,27 @@ function gameLoop() {
     });
     gameState.seeds.forEach((s, i) => {
         ctx.drawImage(seedSprite, 0, (Math.floor(gameState.gameFrame / 10) % 2) * 288, 288, 288, s.x, s.y, 288, 288);
-        if (checkCollision(player, { x: s.x, y: s.y, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70 }, true)) { 
-            gameState.seedInventory++; 
-            gameState.seeds.splice(i, 1); 
-            seedPickupSound.play().catch(() => {}); 
+        if (checkCollision(player, { x: s.x, y: s.y, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70 }, true)) {
+            gameState.seedInventory++;
+            gameState.seeds.splice(i, 1);
+            seedPickupSound.play().catch(() => { });
         }
     });
     gameState.tires.forEach((t, i) => {
         ctx.drawImage(tireSprite, 0, (Math.floor(gameState.gameFrame / 15) % 2) * 300, 300, 300, t.x, t.y, 300, 300);
-        if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) { 
-            gameState.isPowered = true; 
-            gameState.powerTimer = Date.now(); 
-            gameState.tires.splice(i, 1); 
-            tirePickupSound.play().catch(() => {}); 
+        if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) {
+            gameState.isPowered = true;
+            gameState.powerTimer = Date.now();
+            gameState.tires.splice(i, 1);
+            tirePickupSound.play().catch(() => { });
         }
     });
 
     gameState.scythes.forEach((s, i) => {
         ctx.drawImage(scytheSprite, s.x, s.y, 300, 300);
         if (checkCollision(player, { x: s.x, y: s.y, width: 300, height: 300, hitboxOffsetX: 30, hitboxOffsetY: 30 }, true)) {
-            gameState.scythes.splice(i, 1); 
-            seedPickupSound.play().catch(() => {});
+            gameState.scythes.splice(i, 1);
+            seedPickupSound.play().catch(() => { });
             if (!gameState.inventory.includes('scythe')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'scythe'; }
             gameState.scytheDurability = gameState.maxScytheDurability;
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
@@ -371,237 +341,107 @@ function gameLoop() {
 
     if (gameState.hasGun && gameState.isShooting) {
         gameState.ammo -= 0.15;
-        if (gameState.ammo <= 0) { 
-            gameState.hasGun = false; 
-            gameState.isShooting = false; 
-            gameState.gunCoolDownActive = true; 
-            gameState.killsSinceEmpty = 0; 
-            try { shootSound.pause(); } catch(e) {}
+        if (gameState.ammo <= 0) {
+            gameState.hasGun = false;
+            gameState.isShooting = false;
+            gameState.gunCoolDownActive = true;
+            gameState.killsSinceEmpty = 0;
+            try { shootSound.pause(); } catch (e) { }
         }
     }
     if (gameState.gunCoolDownActive && gameState.killsSinceEmpty >= 10) { gameState.gunCoolDownActive = false; gameState.killsSinceEmpty = 0; }
 
-    // --- ENEMIES LAYER ---
-    for (let i = gameState.enemies.length - 1; i >= 0; i--) {
-        let en = gameState.enemies[i];
-        if (!en) continue;
+    // =======================================================
+    // 🎯 MODULAR ALIEN ENGINE SUB-LAYER INTEGRATION
+    // =======================================================
+    updateAndDrawEnemies(createDamageNumber);
 
-        if (en.isDying) {
-            en.deathTimer++; if (en.deathTimer % 6 === 0) en.deathFrame++;
-            if (en.deathFrame < 6) {
-                let col = en.deathFrame % 2, row = Math.floor(en.deathFrame / 2);
-                let deathImg, sW, sH, dH;
-                if (en.type === 2) { deathImg = enemyDeathSprite2; sW = 128; sH = 128; dH = 432; } else { deathImg = enemyDeathSprite; sW = 64; sH = 64; dH = 288; }
-                ctx.drawImage(deathImg, col * sW, row * sH, sW, sH, en.x, en.y, 288, dH);
-            } else {
-                if (gameState.isMultiplayer && gameState.playerRole === 'alien-master' && en.id === gameState.controlledEnemyId) {
-                    gameState.isAlienDead = true;
-                    gameState.alienRespawnTimer = Date.now() + 10000;
-                }
-                gameState.enemies.splice(i, 1);
-            }
-        } else {
-            let dx = player.x - en.x, dy = player.y - en.y, dist = Math.hypot(dx, dy);
-            let moveDir = (gameState.isPowered || (gameState.hasGun && gameState.isShooting)) ? -1 : 1;
-
-            let isPlayerControlledDrone = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
-
-            if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
-                if (en.targetX !== undefined && !isPlayerControlledDrone) {
-                    en.x += (en.targetX - en.x) * 0.18; 
-                    en.y += (en.targetY - en.y) * 0.18;
-                }
-            } else {
-                if (!isPlayerControlledDrone && !en.isLocallyControlled && gameState.playerRole === 'farmer') {
-                    en.x += (dx / dist) * en.speed * moveDir;
-                    en.y += (dy / dist) * en.speed * moveDir;
-                }
-            }
-
-            gameState.seeds.forEach((s, sIdx) => {
-                if (Math.hypot((en.x + 144) - s.x, (en.y + 144) - s.y) < 150) {
-                    gameState.seeds.splice(sIdx, 1);
-                    if (gameState.isMultiplayer && gameState.peerConnection) {
-                        try { gameState.peerConnection.send({ type: 'SEED_STOLEN' }); } catch (e) { }
-                    }
-                }
-            });
-
-            en.fT++;
-            if (en.fT >= 10) {
-                en.fIdx = (en.fIdx + 1) % (en.type === 2 ? 5 : (en.type === 1 ? 3 : 2));
-                en.fT = 0;
-            }
-            let enemyImage;
-            if (en.type === 2) enemyImage = enemySprite2;
-            else if (en.type === 3) enemyImage = enemySprite3;
-            else enemyImage = enemySprite;
-
-            let currentSpriteHeight = 288;
-
-            if (en.type === 2) {
-                currentSpriteHeight = 432;
-                ctx.drawImage(enemyImage, (en.fIdx % 2) * 288, Math.floor(en.fIdx / 2) * 288, 288, 288, en.x, en.y, 288, 432);
-            } else if (en.type === 3) {
-                currentSpriteHeight = 400;
-                ctx.drawImage(enemyImage, 0, en.fIdx * 64, 64, 64, en.x, en.y, 300, 400);
-            } else {
-                currentSpriteHeight = 288;
-                let trueFrame = (typeof en.fIdx === 'number' && !isNaN(en.fIdx)) ? en.fIdx : (Math.floor(gameState.gameFrame / 10) % 3);
-                let spriteCol = trueFrame % 2;
-                let spriteRow = Math.floor(trueFrame / 2);
-
-                ctx.drawImage(
-                    enemyImage,
-                    spriteCol * 288, spriteRow * 288,
-                    288, 288,
-                    en.x, en.y,
-                    288, 288
-                );
-            }
-
-            // --- WEAPON DAMAGE CONTROLLER ---
-            if (gameState.hasGun && gameState.isShooting && Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
-                let pDx = en.x - gameState.playerX;
-                if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0))) {
-                    
-                    if (!en.lastHitTime) en.lastHitTime = 0;
-
-                    if (Date.now() - en.lastHitTime > 380) {
-                        let baseMax = (isPlayerControlledDrone) ? 50 : 10;
-                        if (en.health === undefined) en.health = baseMax;
-
-                        let bulletDamage = 0.25; 
-                        en.health -= bulletDamage;
-                        en.lastHitTime = Date.now(); 
-
-                        createDamageNumber(en.x + 144, en.y, bulletDamage, false);
-
-                        if (en.health <= 0) {
-                            en.isDying = true;
-                            en.deathFrame = 0;
-                            en.deathTimer = 0;
-                            gameState.enemyKillScore++;
+    // --- HOST-ONLY ALIEN COLLISION CALCULATION PASS ---
+    if (gameState.playerRole === 'farmer') {
+        gameState.enemies.forEach(en => {
+            if (!en.isDying && checkCollision(player, en)) {
+                if (gameState.isPowered) {
+                    en.health = 0; en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++;
+                } else {
+                    if (!gameState.isInvincible) {
+                        gameState.playerHealth--;
+                        gameState.isInvincible = true;
+                        gameState.invincibilityTimer = Date.now() + 1000;
+                        if (gameState.playerHealth <= 0) {
+                            if (gameState.isMultiplayer && gameState.peerConnection) {
+                                try { gameState.peerConnection.send({ type: 'GAME_OVER_TRIGGER' }); } catch (e) { }
+                            }
+                            triggerGameOver();
+                            window.focus();
                         }
                     }
                 }
             }
+        });
+    }
 
-            // --- UNIVERSAL ALIEN PLAYER HEALTH BAR OVERLAY ---
-            if (gameState.isMultiplayer && en.id === gameState.controlledEnemyId) {
-                let maxAlienHP = 50;
-                let currentHP = en.health !== undefined ? en.health : maxAlienHP;
+    // --- GUN HIT SCAN CALC BLOCK ---
+    if (gameState.hasGun && gameState.isShooting) {
+        gameState.enemies.forEach(en => {
+            if (en.isDying) return;
+            if (Math.abs((en.y + (en.height / 2)) - (gameState.playerY + 144)) < 150) {
+                let pDx = en.x - gameState.playerX;
+                if (((player.facingRight && pDx > 0) || (!player.facingRight && pDx < 0))) {
+                    if (!en.lastHitTime) en.lastHitTime = 0;
+                    if (Date.now() - en.lastHitTime > 380) {
+                        let isPlayerControlledDrone = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
+                        let baseMax = (isPlayerControlledDrone) ? 50 : 10;
+                        if (en.health === undefined) en.health = baseMax;
 
-                let barWidth = 140;
-                let barHeight = 12;
+                        let bulletDamage = 0.25;
+                        en.health -= bulletDamage;
+                        en.lastHitTime = Date.now();
+                        createDamageNumber(en.x + 144, en.y, bulletDamage, false);
 
-                let spriteRenderWidth = (en.type === 3) ? 300 : 288;
-                let barX = en.x + (spriteRenderWidth / 2) - (barWidth / 2);
-                let barY = en.y - 20;
-
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-                ctx.fillRect(barX, barY, barWidth, barHeight);
-
-                let hpPercentage = Math.max(0, Math.min(1, currentHP / maxAlienHP));
-                ctx.fillStyle = hpPercentage > 0.4 ? '#00ffff' : '#ff3333';
-                ctx.fillRect(barX + 2, barY + 2, (barWidth - 4) * hpPercentage, barHeight - 4);
-
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(barX, barY, barWidth, barHeight);
-            }
-
-            // COLLISION RESOLUTION: Executed solely on Host Machine
-            if (checkCollision(player, en) && gameState.playerRole === 'farmer') {
-                if (gameState.isPowered) {
-                    en.health = 0; en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++;
-                } else {
-                    if (gameState.isMultiplayer && gameState.peerConnection) {
-                        try { gameState.peerConnection.send({ type: 'GAME_OVER_TRIGGER' }); } catch (e) { }
+                        if (en.health <= 0) {
+                            en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++;
+                        }
                     }
-                    triggerGameOver();
-                    window.focus();
                 }
             }
-        }
+        });
     }
 
-    // --- ANIMALS & CHARMS LAYER ---
-    gameState.pigs.forEach((pig) => {
-        if (pig === gameState.carryingPig) { pig.x = gameState.playerX + 50; pig.y = gameState.playerY + 50; }
-        else {
-            pig.x += pig.vx; pig.y += pig.vy;
-            if (pig.x < 0 || pig.x > CANVAS_WIDTH - 240) pig.vx *= -1;
-            if (pig.y < 0 || pig.y > CANVAS_HEIGHT - 240) pig.vy *= -1;
-            pig.fT++; if (pig.fT > 15) { pig.fIdx = (pig.fIdx + 1) % 3; pig.fT = 0; }
-        }
-        ctx.save(); ctx.translate(pig.x + 120, pig.y + 120);
-        if (pig !== gameState.carryingPig && pig.vx < 0) ctx.scale(-1, 1);
-        if (pig === gameState.carryingPig) ctx.drawImage(pigIdle, -120, -120, 240, 240);
-        else ctx.drawImage(pigWalk, (pig.fIdx % 2) * 64, Math.floor(pig.fIdx / 2) * 64, 64, 64, -120, -120, 240, 240);
-        ctx.restore();
-    });
-
-    gameState.chickens.forEach((chicken) => {
-        if (chicken === gameState.carryingChicken) { chicken.x = gameState.playerX + 50; chicken.y = gameState.playerY + 50; }
-        else {
-            chicken.x += chicken.vx; chicken.y += chicken.vy;
-            if (chicken.x < 0 || chicken.x > CANVAS_WIDTH - 240) chicken.vx *= -1;
-            if (chicken.y < 0 || chicken.y > CANVAS_HEIGHT - 240) chicken.vy *= -1;
-            chicken.fT++; if (chicken.fT > 15) { chicken.fIdx = (chicken.fIdx + 1) % 1; chicken.fT = 0; }
-        }
-        ctx.save(); ctx.translate(chicken.x + 120, chicken.y + 120);
-        if (chicken !== gameState.carryingChicken && chicken.vx < 0) ctx.scale(-1, 1);
-        ctx.drawImage(chickenSprite, 0, 0, 64, 64, -120, -120, 240, 240);
-        ctx.restore();
-    });
-
-    if (gameState.carryingPig && checkCollision(player, gameState.corral)) {
-        gameState.pigs.splice(gameState.pigs.indexOf(gameState.carryingPig), 1); gameState.carryingPig = null; gameState.pigsSaved++; 
-        watermelonPickupSound.play().catch(() => {});
-        gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
-    }
-    if (gameState.carryingChicken && checkCollision(player, gameState.corral)) {
-        gameState.chickens.splice(gameState.chickens.indexOf(gameState.carryingChicken), 1); gameState.carryingChicken = null; gameState.chickensSaved++; 
-        watermelonPickupSound.play().catch(() => {});
-        gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
-    }
+    // =======================================================
+    // 🎯 MODULAR LIVESTOCK ENGINE SUB-LAYER INTEGRATION
+    // =======================================================
+    updateAndDrawAnimals();
 
     gameState.charms.forEach((charm, i) => {
         let bobbing = Math.sin(gameState.gameFrame * 0.08) * 12;
         ctx.drawImage(charmSprite, charm.x, charm.y + bobbing, charm.width, charm.height);
         if (checkCollision(player, { x: charm.x, y: charm.y, width: charm.width, height: charm.height }, true)) {
-            gameState.charms.splice(i, 1); 
-            seedPickupSound.play().catch(() => {}); 
+            gameState.charms.splice(i, 1);
+            seedPickupSound.play().catch(() => { });
             gameState.enemyKillScore += 5;
         }
     });
 
-    // --- CROP HARVEST & ROCKET FUEL ACCUMULATION LOOP ---
+    // --- CROP HARVEST LOOP ---
     for (let i = gameState.plantedWatermelons.length - 1; i >= 0; i--) {
         let wm = gameState.plantedWatermelons[i];
         if (!wm.done) { wm.fT++; if (wm.fT > 50) { wm.fIdx++; wm.fT = 0; if (wm.fIdx >= 8) wm.done = true; } }
         let wmCols = 3, wmSize = 288;
         ctx.drawImage(watermelonSprite, (wm.fIdx % wmCols) * wmSize, Math.floor(wm.fIdx / wmCols) * wmSize, wmSize, wmSize, wm.x, wm.y, 288, 288);
-        
-        if (wm.done && checkCollision(player, wm) && gameState.playerRole === 'farmer') {
-            gameState.plantedWatermelons.splice(i, 1); 
-            watermelonPickupSound.play().catch(() => {});
 
-            // ROCKET FUEL ACCUMULATION SYSTEM: Grant +50 Points upon gathering a fully grown plant crop
+        if (wm.done && checkCollision(player, wm) && gameState.playerRole === 'farmer') {
+            gameState.plantedWatermelons.splice(i, 1);
+            watermelonPickupSound.play().catch(() => { });
             gameState.rocketFuel = (gameState.rocketFuel || 0) + 50;
-            if (gameState.rocketFuel > gameState.maxRocketFuel) {
-                gameState.rocketFuel = gameState.maxRocketFuel; // Structural cap clamp boundary enforce
-            }
+            if (gameState.rocketFuel > gameState.maxRocketFuel) gameState.rocketFuel = gameState.maxRocketFuel;
 
             let target = gameState.enemies.find(e => !e.isDying);
-            if (target) { 
-                let cropDamage = 25; 
+            if (target) {
+                let cropDamage = 25;
                 target.health = (target.health !== undefined) ? target.health - cropDamage : 0;
                 createDamageNumber(target.x + 144, target.y, cropDamage, true);
-
                 if (target.health <= 0) {
-                    target.isDying = true; target.deathFrame = 0; target.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++; 
+                    target.isDying = true; target.deathFrame = 0; target.deathTimer = 0; gameState.enemyKillScore++; if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++;
                 }
             }
         }
@@ -610,22 +450,16 @@ function gameLoop() {
     gameState.activeGrenades.forEach((g, i) => {
         if (!g.exploded) {
             g.x += g.vX; g.y += g.vY; g.vY += 0.6; g.timer--;
-            ctx.save(); 
-            ctx.translate(g.x, g.y); 
-            ctx.rotate(gameState.gameFrame * 0.3); 
-            ctx.drawImage(grenadeSprite, -80, -80, 160, 160); 
-            ctx.restore();
+            ctx.save(); ctx.translate(g.x, g.y); ctx.rotate(gameState.gameFrame * 0.3); ctx.drawImage(grenadeSprite, -80, -80, 160, 160); ctx.restore();
             if (g.timer <= 0 && gameState.playerRole === 'farmer') {
-                g.exploded = true; 
-                grenadeExplosionSound.play().catch(() => {});
-                gameState.enemies.forEach(en => { 
-                    if (Math.hypot(en.x - g.x, en.y - g.y) < 450) { 
-                        let grenadeDamage = 20; 
+                g.exploded = true; grenadeExplosionSound.play().catch(() => { });
+                gameState.enemies.forEach(en => {
+                    if (Math.hypot(en.x - g.x, en.y - g.y) < 450) {
+                        let grenadeDamage = 20;
                         en.health = (en.health !== undefined) ? en.health - grenadeDamage : 0;
                         createDamageNumber(en.x + 144, en.y, grenadeDamage, true);
-
                         if (en.health <= 0) { en.isDying = true; en.deathFrame = 0; gameState.enemyKillScore++; }
-                    } 
+                    }
                 });
             }
         } else {
@@ -636,136 +470,98 @@ function gameLoop() {
 
     if (gameState.carryingGrenade) ctx.drawImage(grenadeSprite, gameState.playerX + (player.facingRight ? 200 : -20), gameState.playerY + 80, 160, 160);
 
-    // --- RENDER FLOATING DAMAGE POPUPS ---
+    // --- POPUPS CONTAINER RENDER ---
     for (let k = gameState.damageNumbers.length - 1; k >= 0; k--) {
         let dmgNum = gameState.damageNumbers[k];
-        dmgNum.y += dmgNum.vY;
-        dmgNum.alpha -= 0.025; 
-
-        if (dmgNum.alpha <= 0) {
-            gameState.damageNumbers.splice(k, 1);
-        } else {
-            ctx.save();
-            ctx.globalAlpha = dmgNum.alpha;
-            ctx.fillStyle = dmgNum.color;
-            ctx.font = `bold ${dmgNum.size}px Impact, Arial Black`;
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = 4;
-            ctx.strokeText(dmgNum.text, dmgNum.x, dmgNum.y);
-            ctx.fillText(dmgNum.text, dmgNum.x, dmgNum.y);
-            ctx.restore();
+        dmgNum.y += dmgNum.vY; dmgNum.alpha -= 0.025;
+        if (dmgNum.alpha <= 0) { gameState.damageNumbers.splice(k, 1); }
+        else {
+            ctx.save(); ctx.globalAlpha = dmgNum.alpha; ctx.fillStyle = dmgNum.color; ctx.font = `bold ${dmgNum.size}px Impact, Arial Black`;
+            ctx.strokeStyle = 'black'; ctx.lineWidth = 4; ctx.strokeText(dmgNum.text, dmgNum.x, dmgNum.y); ctx.fillText(dmgNum.text, dmgNum.x, dmgNum.y); ctx.restore();
         }
     }
 
-    // --- HUD AND METRIC PRINTS ---
+    // --- HUD PANEL SYSTEM ---
     ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(10, 10, 850, 240);
     ctx.fillStyle = 'white'; ctx.font = '40px Arial';
 
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
         ctx.fillStyle = '#00ffff'; ctx.fillText(`神经网络链接: VERSUS PILOT ACTIVE`, 30, 60);
-        
         if (gameState.isAlienDead) {
             let remainingTime = Math.max(0, Math.ceil((gameState.alienRespawnTimer - Date.now()) / 1000));
-            ctx.save();
-            ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
-            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-            ctx.textAlign = 'center';
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 70px Arial';
-            ctx.fillText(`MASTER VESSEL DESTROYED`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40);
-            ctx.fillStyle = '#00ffff';
-            ctx.font = '50px Arial';
-            ctx.fillText(`RESPAWNING IN: ${remainingTime}s`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 50);
-            ctx.restore();
-
-            if (Date.now() >= gameState.alienRespawnTimer) {
-                dispatchMasterVesselSpawn();
-            }
+            ctx.save(); ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT); ctx.textAlign = 'center';
+            ctx.fillStyle = 'white'; ctx.font = 'bold 70px Arial'; ctx.fillText(`MASTER VESSEL DESTROYED`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40);
+            ctx.fillStyle = '#00ffff'; ctx.font = '50px Arial'; ctx.fillText(`RESPAWNING IN: ${remainingTime}s`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 50); ctx.restore();
+            if (Date.now() >= gameState.alienRespawnTimer) { dispatchMasterVesselSpawn(); }
         }
     } else {
         ctx.fillText(`Seeds: ${gameState.seedInventory} | Kills: ${gameState.enemyKillScore} | Saved: ${gameState.pigsSaved}`, 30, 60);
+        if (gameState.playerRole === 'farmer') {
+            let heartX = 680; let heartY = 55;
+            for (let h = 0; h < gameState.maxPlayerHealth; h++) {
+                ctx.font = '38px Arial';
+                if (h < gameState.playerHealth) { ctx.fillStyle = '#ff2222'; ctx.fillText('♥', heartX + (h * 42), heartY); }
+                else { ctx.fillStyle = 'rgba(255, 255, 255, 0.18)'; ctx.fillText('♥', heartX + (h * 42), heartY); }
+            }
+        }
     }
-
     if (gameState.hasGun) {
         ctx.fillText("AMMO:", 30, 135); ctx.fillStyle = 'black'; ctx.fillRect(180, 110, 200, 30);
         ctx.fillStyle = gameState.ammo > 30 ? '#00FF00' : '#FF0000'; ctx.fillRect(180, 110, gameState.ammo * 2, 30);
     } else if (gameState.gunCoolDownActive) {
         ctx.fillStyle = 'orange'; ctx.fillText(`RELOADING: ${gameState.killsSinceEmpty}/10 Kills`, 30, 135);
     }
-
     if (gameState.hasScythe) {
         ctx.fillStyle = 'white'; ctx.fillText("SCYTHE:", 30, 210); ctx.fillStyle = 'black'; ctx.fillRect(210, 185, 200, 30);
-        let durPct = gameState.scytheDurability / gameState.maxScytheDurability;
-        ctx.fillStyle = durPct > 0.35 ? '#00bfff' : '#FFaa00'; ctx.fillRect(210, 185, 200 * durPct, 30);
+        let durPct = gameState.scytheDurability / gameState.maxScytheDurability; ctx.fillStyle = durPct > 0.35 ? '#00bfff' : '#FFaa00'; ctx.fillRect(210, 185, 200 * durPct, 30);
     }
 
+    // --- NETWORK CHANNEL INTERFACE HANDSHAKE payload ---
     if (gameState.isMultiplayer && gameState.playerRole === 'farmer' && gameState.peerConnection && gameState.gameFrame % 3 === 0) {
         try {
             gameState.peerConnection.send({
                 type: 'SYNC_ENEMIES',
                 enemies: gameState.enemies.map(en => ({
-                    id: en.id,
-                    x: Math.round(en.x),
-                    y: Math.round(en.y),
-                    type: parseInt(en.type) || 1,
-                    isDying: en.isDying ? true : false,
-                    health: en.health 
+                    id: en.id, x: Math.round(en.x), y: Math.round(en.y), type: parseInt(en.type) || 1, isDying: en.isDying ? true : false, health: en.health
                 }))
             });
-
             gameState.peerConnection.send({
                 type: 'SYNC_FARMER',
-                playerX: Math.round(gameState.playerX),
-                playerY: Math.round(gameState.playerY),
-                isShooting: gameState.isShooting,
-                isMoving: localIsMoving,
+                playerX: Math.round(gameState.playerX), playerY: Math.round(gameState.playerY), isShooting: gameState.isShooting, isMoving: localIsMoving,
                 plowedPatches: gameState.plowedPatches.map(p => ({ x: p.x, y: p.y, size: p.size })),
                 plantedWatermelons: gameState.plantedWatermelons.map(w => ({ x: w.x, y: w.y, fIdx: w.fIdx, done: w.done })),
                 seeds: gameState.seeds.map(s => ({ x: s.x, y: s.y })),
                 pigs: gameState.pigs.map(p => ({ x: Math.round(p.x), y: Math.round(p.y), vx: p.vx, vy: p.vy, fIdx: p.fIdx })),
                 chickens: gameState.chickens.map(c => ({ x: Math.round(c.x), y: Math.round(c.y), vx: c.vx, vy: c.vy, fIdx: c.fIdx })),
+                spaceCows: gameState.spaceCows ? gameState.spaceCows.map(cow => ({ x: Math.round(cow.x), y: Math.round(cow.y), vx: cow.vx, vy: cow.vy })) : [],
                 charms: gameState.charms.map(ch => ({ x: ch.x, y: ch.y, width: ch.width, height: ch.height })),
-                grenadesOnGround: gameState.grenadesOnGround.map(g => ({ x: g.x, y: g.y })),
-                activeGrenades: gameState.activeGrenades.map(ag => ({ x: ag.x, y: ag.y, exploded: ag.exploded })),
-                carryingGrenade: gameState.carryingGrenade ? true : false,
-                guns: gameState.guns.map(gu => ({ x: gu.x, y: gu.y })),
-                activeSlot: parseInt(gameState.activeSlot) || 0,
-                inventory: gameState.inventory,
-                hasScythe: gameState.hasScythe,
-                hasGun: gameState.hasGun,
-                rocketFuel: gameState.rocketFuel // SYNC OVER NETWORK CHANNEL: Keeps the secondary player matching
+                grenadesOnGround: gameState.grenadesOnGround.map(g => ({ x: g.x, y: g.y })), activeGrenades: gameState.activeGrenades.map(ag => ({ x: ag.x, y: ag.y, exploded: ag.exploded })),
+                carryingGrenade: gameState.carryingGrenade ? true : false, guns: gameState.guns.map(gu => ({ x: gu.x, y: gu.y })), activeSlot: parseInt(gameState.activeSlot) || 0,
+                inventory: gameState.inventory, hasScythe: gameState.hasScythe, hasGun: gameState.hasGun, rocketFuel: gameState.rocketFuel, playerHealth: gameState.playerHealth
             });
-        } catch(e) {}
+        } catch (e) { }
     }
-
     requestAnimationFrame(gameLoop);
 }
 
 function spawnTick() {
     if (gameState.isPaused || gameState.isGameOver) return;
-
     if (gameState.isMultiplayer) {
         window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
         return;
     }
 
-    const c1 = gameState.enemies.filter(e => e.type === 1).length,
-        c2 = gameState.enemies.filter(e => e.type === 2).length,
+    const c2 = gameState.enemies.filter(e => e.type === 2).length,
         c3 = gameState.enemies.filter(e => e.type === 3).length;
 
     let possible = [];
-    if (c1 < (40 + Math.floor(gameState.enemyKillScore / 10))) possible.push(1);
     if ((gameState.enemyKillScore >= 20 || gameState.pigsSaved >= 10) && c2 < 8) possible.push(2);
     if (gameState.enemyKillScore >= 40 && c3 < 4) possible.push(3);
 
     if (possible.length > 0) {
-        let spawnedEnemy = createEnemy(possible[Math.floor(Math.random() * possible.length)]);
-        if (spawnedEnemy) {
-            spawnedEnemy.health = spawnedEnemy.type === 2 ? 3 : (spawnedEnemy.type === 3 ? 5 : 2);
-            gameState.enemies.push(spawnedEnemy);
-        }
+        let spawnedEnemy = createEnemyData(possible[Math.floor(Math.random() * possible.length)]);
+        if (spawnedEnemy) gameState.enemies.push(spawnedEnemy);
     }
-
     window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
 }
 
@@ -773,6 +569,26 @@ function startTrackingIntervals() {
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.seeds.length < 5) gameState.seeds.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 12000));
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.pigs.length < 5 && !gameState.isPaused) gameState.pigs.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 }); }, 5000));
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.chickens.length < 5 && !gameState.isPaused) gameState.chickens.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, fIdx: 0, fT: 0, width: 240, height: 240 }); }, 5000));
+
+    gameIntervals.push(setInterval(() => {
+        if (!gameState.isGameOver && gameState.spaceCows && gameState.spaceCows.length < 3 && !gameState.isPaused) {
+            gameState.spaceCows.push({ x: Math.random() * 2200, y: Math.random() * 2200, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, width: 240, height: 240 });
+        }
+    }, 8000));
+
+    // 🎯 INDEPENDENT ENEMY 1 (DRONE) SPAWNER LOOP
+    gameIntervals.push(setInterval(() => {
+        // Count how many Type 1 drones are currently on the field
+        const currentDrones = gameState.enemies.filter(e => e.type === 1).length;
+        // Dynamic cap based on your existing difficulty math
+        const droneCap = 40 + Math.floor(gameState.enemyKillScore / 10);
+
+        if (!gameState.isGameOver && !gameState.isPaused && currentDrones < droneCap) {
+            let spawnedEnemy = createEnemyData(1); // Generates a fresh Type 1 Drone object
+            if (spawnedEnemy) gameState.enemies.push(spawnedEnemy);
+        }
+    }, 10000)); // ⏱️ ADJUST THIS: Current setup tries to spawn a drone every 3000ms (3 seconds)
+
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.tires.length < 1) gameState.tires.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 75000));
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.enemyKillScore >= 5 && !gameState.hasGun && !gameState.gunCoolDownActive && gameState.guns.length === 0) gameState.guns.push({ x: Math.random() * 2000, y: Math.random() * 2000 }); }, 4000));
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.enemies.length > 12 && gameState.grenadesOnGround.length < 1) gameState.grenadesOnGround.push({ x: Math.random() * 2000 + 200, y: Math.random() * 2000 + 200 }); }, 5000));
@@ -791,49 +607,35 @@ function startGame() {
     gameAudio.play().catch(e => console.log("Audio blocked"));
     initInput(); spawnTick();
     gameState.inventory[0] = 'scythe'; gameState.hasScythe = true;
-
     startTrackingIntervals();
     gameLoop();
 }
 
 startButton.addEventListener('click', startGame);
-
 hostFarmerBtn.addEventListener('click', () => {
     const roomCode = roomCodeInput.value.trim().toLowerCase();
     if (!roomCode) return alert("Please enter a room code first!");
     initMultiplayer('farmer', roomCode);
     startGame();
 });
-
 joinMasterBtn.addEventListener('click', () => {
     const roomCode = roomCodeInput.value.trim().toLowerCase();
     if (!roomCode) return alert("Please enter a room code first!");
-
     initMultiplayer('alien-master', roomCode);
     startScreen.style.display = 'none';
     initInput();
     gameLoop();
-
     dispatchMasterVesselSpawn();
 });
 
 window.addEventListener('keydown', e => {
     if (e.key === 'Enter') startGame();
-
     if (e.key === 'r' || e.key === 'R' || e.keyCode === 82) {
-        // ALLOW RESET ON EITHER SCREEN LAYER
         if (gameState.isGameOver || gameState.isGameWon) {
             console.log("🎯 R Key registered cleanly.");
-            if (document.activeElement && document.activeElement.blur) {
-                document.activeElement.blur();
-            }
-
+            if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
             if (gameState.isMultiplayer && gameState.peerConnection && gameState.peerConnection.open) {
-                try {
-                    gameState.peerConnection.send({ type: 'REMOTE_SOFT_RESET' });
-                } catch(err) {
-                    console.error("PeerJS sync reset frame dropped:", err);
-                }
+                try { gameState.peerConnection.send({ type: 'REMOTE_SOFT_RESET' }); } catch (err) { }
             }
             resetGameSession();
         }

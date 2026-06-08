@@ -16,4 +16,5 @@ export const pigWalk = new Image(); pigWalk.src = 'assets/SpacePigWalking.png';
 export const grenadeSprite = new Image(); grenadeSprite.src = 'assets/Grenade.png';
 export const chickenSprite = new Image(); chickenSprite.src = 'assets/SpaceChicken.png';
 export const charmSprite = new Image(); charmSprite.src = 'assets/charm.png';
-export const scytheSprite = new Image(); scytheSprite.src = 'assets/scythe.png'; 
+export const scytheSprite = new Image(); scytheSprite.src = 'assets/scythe.png';
+export const spaceCowSprite = new Image(); spaceCowSprite.src = 'assets/SpaceCow2.png'; 

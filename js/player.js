@@ -3,44 +3,82 @@ import { gameState } from './state.js';
 import { playerImage, tractorSprite, ak47Shooting, ak47Idle, scytheSprite } from './assets.js';
 
 export const player = {
-    width: 288, height: 288,
-    hitboxOffsetX: 110, hitboxOffsetY: 110,
+    width: 288, 
+    height: 288,
+    hitboxOffsetX: 110, 
+    hitboxOffsetY: 110,
     facingRight: false,
+
     update() {
-        this.x = gameState.playerX; this.y = gameState.playerY;
-        if (gameState.moveLeft) this.facingRight = false;
-        if (gameState.moveRight) this.facingRight = true;
+        this.x = gameState.playerX; 
+        this.y = gameState.playerY;
+        
+        // 🎯 FIX: Explicitly check all active keys so he faces where he's running
+        if (gameState.moveLeft || gameState.moveUp) {
+            this.facingRight = false;
+        }
+        if (gameState.moveRight || gameState.moveDown) {
+            this.facingRight = true;
+        }
     },
+
     draw(ctx) {
         if (gameState.isPowered) {
             ctx.save();
-            if (this.facingRight) { ctx.translate(this.x + 288, this.y + 288); ctx.scale(-1, 1); ctx.translate(-(this.x + 288), -(this.y + 288)); }
+            if (this.facingRight) { 
+                ctx.translate(this.x + 288, this.y + 288); 
+                ctx.scale(-1, 1); 
+                ctx.translate(-(this.x + 288), -(this.y + 288)); 
+            }
             let tractorFrame = Math.floor(gameState.gameFrame / 6) % 9;
             ctx.drawImage(tractorSprite, (tractorFrame % 3) * 288, Math.floor(tractorFrame / 3) * 288, 288, 288, this.x, this.y, 576, 576);
             ctx.restore();
         } else {
-            // Draw base farmer sprite
-            ctx.drawImage(playerImage, 0, (gameState.isMoving ? (Math.floor(gameState.gameFrame / 10) % 2) : 0) * 288, 288, 288, this.x, this.y, 288, 288);
+            // 🎯 FIX: Detect movement keys to determine if the run-cycle animation rows should play
+            let checksMoving = (gameState.moveLeft || gameState.moveRight || gameState.moveUp || gameState.moveDown);
+            let frameYOffset = (checksMoving ? (Math.floor(gameState.gameFrame / 10) % 2) : 0) * 288;
+
+            // --- 1. RENDER BASE FARMER PLAYER ---
+            ctx.save();
+            ctx.translate(this.x + 144, this.y);
             
-            // --- WEAPON RENDER SYSTEM ---
+            // Mirror the body horizontally when moving left or up
+            if (!this.facingRight) {
+                ctx.scale(-1, 1);
+            }
+            
+            ctx.drawImage(
+                playerImage, 
+                0, frameYOffset,  // Source Crop Box Start (Animates rows perfectly!)
+                288, 288,         // Source Crop Cell Size
+                -144, 0,          // Destination Offset (Centers back over this.x)
+                288, 288          // Render Target Size
+            );
+            ctx.restore();
+            
+            // --- 2. WEAPON RENDER SYSTEM ---
             if (gameState.hasGun) {
                 ctx.save();
-                ctx.translate(this.x + 140, this.y + 160 + (gameState.isMoving ? Math.sin(gameState.gameFrame * 0.2) * 5 : 0));
+                ctx.translate(this.x + 140, this.y + 160 + (checksMoving ? Math.sin(gameState.gameFrame * 0.2) * 5 : 0));
+                
+                // Flip the gun container layer on right/down keys to handle the backward graphic alignment
                 if (this.facingRight) ctx.scale(-1, 1);
+                
                 if (gameState.isShooting && gameState.ammo > 0) {
                     let sF = Math.floor(gameState.gameFrame / 4) % 4;
                     ctx.drawImage(ak47Shooting, (sF % 2) * 64, Math.floor(sF / 2) * 64, 64, 64, -100, -100, 200, 200);
-                } else { ctx.drawImage(ak47Idle, -100, -100, 200, 200); }
+                } else { 
+                    ctx.drawImage(ak47Idle, -100, -100, 200, 200); 
+                }
                 ctx.restore();
             } 
-            // FIXED: Added check to visually render scythe when holding it
             else if (gameState.hasScythe) {
                 ctx.save();
-                // Anchors and bobs weapon dynamically with the player's movement animation
-                ctx.translate(this.x + 140, this.y + 160 + (gameState.isMoving ? Math.sin(gameState.gameFrame * 0.2) * 5 : 0));
+                ctx.translate(this.x + 140, this.y + 160 + (checksMoving ? Math.sin(gameState.gameFrame * 0.2) * 5 : 0));
+                
+                // Mirror the tool layer cleanly alongside the firearm asset structure
                 if (this.facingRight) ctx.scale(-1, 1);
                 
-                // Draws your custom scythe image asset relative to the hand position
                 ctx.drawImage(scytheSprite, -100, -100, 200, 200);
                 ctx.restore();
             }
