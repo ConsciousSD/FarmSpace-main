@@ -1,0 +1,19 @@
+{
+  "name": "farmspace-main",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ConsciousSD/FarmSpace-main.git"
+  },
+  "author": "Rafael Pimentel",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ConsciousSD/FarmSpace-main/issues"
+  },
+  "homepage": "https://github.com/ConsciousSD/FarmSpace-main#readme",
+  "description": ""
+}
