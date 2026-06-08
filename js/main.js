@@ -143,6 +143,7 @@ export function resetGameSession() {
     gameState.activeGrenades = [];
     gameState.carryingGrenade = false;
     gameState.guns = [];
+    gameState.enemyLasers = [];
 
     if (gameState.playerRole === 'alien-master') {
         dispatchMasterVesselSpawn();
@@ -203,15 +204,28 @@ function gameLoop() {
         ctx.drawImage(grenadeSprite, g.x - pulse, g.y - pulse, 160 + pulse * 2, 160 + pulse * 2);
     });
 
-    // --- PLAYER DRAW LAYER ---
+    // =======================================================
+    // 👩‍🌾 UNIVERSAL PLAYER DRAW LAYER
+    // =======================================================
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
+        // 🛸 ALIEN MASTER CLIENT PERSPECTIVE (YOU)
+        if (gameState.targetPlayerX !== undefined) {
+            gameState.playerX += (gameState.targetPlayerX - gameState.playerX) * 0.22;
+            gameState.playerY += (gameState.targetPlayerY - gameState.playerY) * 0.22;
+        }
         player.x = gameState.playerX;
         player.y = gameState.playerY;
+
+        // 🎯 FIX: Let the client master state drive the player instance directions smoothly
         if (gameState.moveLeft) player.facingRight = false;
         if (gameState.moveRight) player.facingRight = true;
+
         player.draw(ctx);
     } else {
+        // 👩‍🌾 AUTHORITATIVE HOST FARMER ENGINE (YOUR WIFE)
         player.update();
+
+        // 🎯 FIX: Just call draw cleanly! No more old canvas matrices fighting the new player.js code
         player.draw(ctx);
     }
 
@@ -237,7 +251,6 @@ function gameLoop() {
         else if (item === 'gun') ctx.drawImage(ak47Idle, boxX + 5, startY + 5, boxSize - 10, boxSize - 10);
     }
 
-    // --- DRAW ROCKET FUEL METRIC ---
     drawRocketFuelBar();
 
     if (gameState.isPaused) { requestAnimationFrame(gameLoop); return; }
@@ -268,7 +281,6 @@ function gameLoop() {
         return;
     }
 
-    // --- SHARED GAME OVER UI ---
     if (gameState.isGameOver) {
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         ctx.textAlign = 'center'; ctx.fillStyle = 'white'; ctx.font = 'bold 160px Arial';
@@ -299,9 +311,11 @@ function gameLoop() {
         }
     }
 
-    // Weapon ground collisions
-    gameState.guns.forEach((g, i) => {
+    // --- WEAPON GROUND COLLISION MANAGEMENT CONTAINER ---
+    let gunToDestroy = null;
+    gameState.guns.forEach((g) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 160, 160);
+
         if (checkCollision(player, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
             gameState.guns.splice(i, 1);
             seedPickupSound.play().catch(() => { });
@@ -309,7 +323,29 @@ function gameLoop() {
             if (!gameState.inventory.includes('gun')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; }
             gameState.hasGun = (gameState.inventory[gameState.activeSlot] === 'gun'); gameState.hasScythe = (gameState.inventory[gameState.activeSlot] === 'scythe');
         }
+        else {
+            gameState.enemies.forEach((en) => {
+                if (en.type === 1 && !en.isDying && !en.hasGun) {
+                    if (checkCollision(en, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
+                        gunToDestroy = g;
+                        en.hasGun = true;
+                        en.pickupDone = false;
+                        en.fIdx = 0;
+                        en.fT = 0;
+                        en.speed += 1.2;
+                        seedPickupSound.currentTime = 0;
+                        seedPickupSound.play().catch(() => { });
+                    }
+                }
+            });
+        }
     });
+
+    if (gunToDestroy) {
+        let destroyIdx = gameState.guns.indexOf(gunToDestroy);
+        if (destroyIdx !== -1) gameState.guns.splice(destroyIdx, 1);
+    }
+
     gameState.seeds.forEach((s, i) => {
         ctx.drawImage(seedSprite, 0, (Math.floor(gameState.gameFrame / 10) % 2) * 288, 288, 288, s.x, s.y, 288, 288);
         if (checkCollision(player, { x: s.x, y: s.y, width: 288, height: 288, hitboxOffsetX: 70, hitboxOffsetY: 70 }, true)) {
@@ -319,6 +355,7 @@ function gameLoop() {
         }
     });
     gameState.tires.forEach((t, i) => {
+        // This runs for BOTH players, so the asset draws on both screens!
         ctx.drawImage(tireSprite, 0, (Math.floor(gameState.gameFrame / 15) % 2) * 300, 300, 300, t.x, t.y, 300, 300);
         if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) {
             gameState.isPowered = true;
@@ -547,7 +584,7 @@ function gameLoop() {
 function spawnTick() {
     if (gameState.isPaused || gameState.isGameOver) return;
     if (gameState.isMultiplayer) {
-        window.spawnTickTimeout = setTimeout(spawnTick, 3000 * gameState.spawnRateMultiplier);
+        window.spawnTickTimeout = setTimeout(spawnTick, 8000 * gameState.spawnRateMultiplier);
         return;
     }
 

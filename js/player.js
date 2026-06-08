@@ -1,5 +1,4 @@
 import { gameState } from './state.js';
-// FIXED: Added scytheSprite to the asset imports
 import { playerImage, tractorSprite, ak47Shooting, ak47Idle, scytheSprite } from './assets.js';
 
 export const player = {
