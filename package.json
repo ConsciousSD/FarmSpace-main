@@ -1,6 +1,6 @@
 {
-  "name": "farmspace-main",
-  "version": "1.0.0",
+  "name": "farmspace",
+  "version": "1.0.1",
   "main": "app.js",
   "scripts": {
     "start": "electron-forge start",
@@ -32,5 +32,25 @@
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1",
     "peerjs": "^1.5.5"
+  },
+  "config": {
+    "forge": {
+      "packagerConfig": {
+        "tmpdir": "C:\\FarmSpace-build-temp",
+        "ignore": [
+          "node_modules/\\.bin",
+          "\\.vscode",
+          "\\.git"
+        ]
+      },
+      "makers": [
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": [
+            "win32"
+          ]
+        }
+      ]
+    }
   }
 }

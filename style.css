@@ -63,7 +63,7 @@
 }
 
 /* ==========================================
-   ADDED: MANUAL MODAL & HUD OVERLAY STYLES 
+   MANUAL MODAL & HUD OVERLAY STYLES 
    ========================================== */
 
 /* Trigger Button Design */
@@ -209,4 +209,43 @@
 
 .close-button:hover {
     color: #fff;
+}
+
+/* ==========================================
+   ADDED: ELECTRON APP DESKTOP CONFIGURATIONS 
+   ========================================== */
+
+/* Safety asset hiding rule */
+.hidden-asset {
+    display: none;
+}
+
+/* Update Banner Box Layout Rules */
+.hidden-banner {
+    display: none;
+    background-color: rgba(255, 50, 50, 0.25);
+    border: 2px solid #ff3333;
+    color: #ffffff;
+    padding: 12px;
+    margin: 15px auto;
+    width: 80%;
+    border-radius: 6px;
+    font-weight: bold;
+    font-family: Arial, sans-serif;
+    text-align: center;
+}
+
+/* Permanent Version Text Styling - Positioned at the bottom of the screen */
+.menu-version-text {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 25; /* Keeps it layered cleanly over the canvas background */
+    font-family: 'Arial', sans-serif;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.4); /* Subtle transparent white */
+    letter-spacing: 2px;
+    font-weight: bold;
+    pointer-events: none; /* Ensures players can't accidentally click it */
 }

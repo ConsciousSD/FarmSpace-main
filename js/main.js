@@ -308,7 +308,6 @@ function gameLoop() {
 
     // --- WEAPON GROUND COLLISION MANAGEMENT CONTAINER ---
     let gunToDestroy = null;
-    // 🎯 FIX: Added explicit index mapping tracking variables ('weaponIdx') into the execution signature
     gameState.guns.forEach((g, weaponIdx) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 160, 160);
 
@@ -325,16 +324,11 @@ function gameLoop() {
                     if (checkCollision(en, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
                         gunToDestroy = g;
                         en.hasGun = true;
-
-                        // 🎯 TRIGGER NEW TRANSFORMATION STATE
                         en.isTransforming = true;
                         en.transformFrame = 0;
                         en.transformTimer = 0;
-
-                        // Freeze them in place during the pickup animation sequence
                         en.savedBaseSpeed = en.speed || 2.0;
                         en.speed = 0;
-
                         seedPickupSound.currentTime = 0;
                         seedPickupSound.play().catch(() => { });
                     }
@@ -631,8 +625,39 @@ function startTrackingIntervals() {
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && !gameState.hasScythe && gameState.scythes.length < 1) gameState.scythes.push({ x: Math.random() * 2000 + 100, y: Math.random() * 2000 + 100 }); }, 30000));
 }
 
+// 🌐 LIVE INTERNET VERSION ASYNC CHECK ENGINE
+export function checkForUpdates() {
+    const currentVersion = "1.0.0"; // Matches your hardcoded app snapshot version
+    const versionUrl = "https://conscioussd.github.io/FarmSpace-main/version.txt";
+    // 🎯 ADD THIS LINE HERE: Dynamically writes the current version onto the menu screen
+    const versionDisplay = document.getElementById('version-display');
+    if (versionDisplay) versionDisplay.innerText = `v${currentVersion}`;
+    fetch(versionUrl)
+        .then(response => {
+            if (!response.ok) throw new Error("Could not contact GitHub repository channel");
+            return response.text();
+        })
+        .then(latestVersion => {
+            const cleanLatest = latestVersion.trim();
+            if (cleanLatest !== currentVersion) {
+                console.log(`📢 Update available! Client version: ${currentVersion} -> Server version: ${cleanLatest}`);
+                showUpdateNotification(cleanLatest);
+            } else {
+                console.log("✅ Client matches master payload registry. Game up to date.");
+            }
+        })
+        .catch(err => console.log("Update link check bypassed or offline:", err));
+}
+
+function showUpdateNotification(newVersion) {
+    alert(`A new patch update (v${newVersion}) is live! Please download the latest compressed .zip bundle from your host provider to apply the latest mechanics and stability improvements.`);
+}
+
 // --- DOM SAFE INITIALIZATION WRAPPER ---
 document.addEventListener('DOMContentLoaded', () => {
+    // 🚀 FIRING AUTOMATED VERSION CHECK INSTANTLY ON ENGINE WAKEUP
+    checkForUpdates();
+
     const startButton = document.getElementById('start-button');
     const startScreen = document.getElementById('start-screen');
     const hostFarmerBtn = document.getElementById('host-farmer-btn');
