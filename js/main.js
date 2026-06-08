@@ -208,7 +208,6 @@ function gameLoop() {
     // 👩‍🌾 UNIVERSAL PLAYER DRAW LAYER
     // =======================================================
     if (gameState.isMultiplayer && gameState.playerRole === 'alien-master') {
-        // 🛸 ALIEN MASTER CLIENT PERSPECTIVE (YOU)
         if (gameState.targetPlayerX !== undefined) {
             gameState.playerX += (gameState.targetPlayerX - gameState.playerX) * 0.22;
             gameState.playerY += (gameState.targetPlayerY - gameState.playerY) * 0.22;
@@ -216,16 +215,12 @@ function gameLoop() {
         player.x = gameState.playerX;
         player.y = gameState.playerY;
 
-        // 🎯 FIX: Let the client master state drive the player instance directions smoothly
         if (gameState.moveLeft) player.facingRight = false;
         if (gameState.moveRight) player.facingRight = true;
 
         player.draw(ctx);
     } else {
-        // 👩‍🌾 AUTHORITATIVE HOST FARMER ENGINE (YOUR WIFE)
         player.update();
-
-        // 🎯 FIX: Just call draw cleanly! No more old canvas matrices fighting the new player.js code
         player.draw(ctx);
     }
 
@@ -313,11 +308,12 @@ function gameLoop() {
 
     // --- WEAPON GROUND COLLISION MANAGEMENT CONTAINER ---
     let gunToDestroy = null;
-    gameState.guns.forEach((g) => {
+    // 🎯 FIX: Added explicit index mapping tracking variables ('weaponIdx') into the execution signature
+    gameState.guns.forEach((g, weaponIdx) => {
         ctx.drawImage(ak47Idle, g.x, g.y, 160, 160);
 
         if (checkCollision(player, { x: g.x, y: g.y, width: 160, height: 160, hitboxOffsetX: 20, hitboxOffsetY: 20 }, true)) {
-            gameState.guns.splice(i, 1);
+            gameState.guns.splice(weaponIdx, 1);
             seedPickupSound.play().catch(() => { });
             gameState.ammo = 100;
             if (!gameState.inventory.includes('gun')) { let emptySlot = gameState.inventory.indexOf(null); if (emptySlot !== -1) gameState.inventory[emptySlot] = 'gun'; }
@@ -355,7 +351,6 @@ function gameLoop() {
         }
     });
     gameState.tires.forEach((t, i) => {
-        // This runs for BOTH players, so the asset draws on both screens!
         ctx.drawImage(tireSprite, 0, (Math.floor(gameState.gameFrame / 15) % 2) * 300, 300, 300, t.x, t.y, 300, 300);
         if (checkCollision(player, { x: t.x, y: t.y, width: 300, height: 300, hitboxOffsetX: 50, hitboxOffsetY: 50 }, true)) {
             gameState.isPowered = true;
@@ -615,16 +610,14 @@ function startTrackingIntervals() {
 
     // 🎯 INDEPENDENT ENEMY 1 (DRONE) SPAWNER LOOP
     gameIntervals.push(setInterval(() => {
-        // Count how many Type 1 drones are currently on the field
         const currentDrones = gameState.enemies.filter(e => e.type === 1).length;
-        // Dynamic cap based on your existing difficulty math
         const droneCap = 40 + Math.floor(gameState.enemyKillScore / 10);
 
         if (!gameState.isGameOver && !gameState.isPaused && currentDrones < droneCap) {
-            let spawnedEnemy = createEnemyData(1); // Generates a fresh Type 1 Drone object
+            let spawnedEnemy = createEnemyData(1);
             if (spawnedEnemy) gameState.enemies.push(spawnedEnemy);
         }
-    }, 10000)); // ⏱️ ADJUST THIS: Current setup tries to spawn a drone every 3000ms (3 seconds)
+    }, 10000));
 
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.tires.length < 1) gameState.tires.push({ x: Math.random() * 2200, y: Math.random() * 2200 }); }, 75000));
     gameIntervals.push(setInterval(() => { if (!gameState.isGameOver && gameState.enemyKillScore >= 5 && !gameState.hasGun && !gameState.gunCoolDownActive && gameState.guns.length === 0) gameState.guns.push({ x: Math.random() * 2000, y: Math.random() * 2000 }); }, 4000));

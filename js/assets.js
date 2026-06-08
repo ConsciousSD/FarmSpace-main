@@ -18,3 +18,20 @@ export const chickenSprite = new Image(); chickenSprite.src = 'assets/SpaceChick
 export const charmSprite = new Image(); charmSprite.src = 'assets/charm.png';
 export const scytheSprite = new Image(); scytheSprite.src = 'assets/scythe.png';
 export const spaceCowSprite = new Image(); spaceCowSprite.src = 'assets/SpaceCow2.png'; 
+
+// =======================================================
+// 🎯 FIXED CASE-SENSITIVE PATHS & EXPORTS
+// =======================================================
+export const poltra_gets_gun = new Image();
+poltra_gets_gun.src = 'assets/poltra_gets_gun.png';
+
+export const poltra_with_gun = new Image();
+poltra_with_gun.src = 'assets/poltra_with_gun.png';
+
+export const lazer_bullet = new Image();
+lazer_bullet.src = 'assets/lazer_bullet.png';
+
+// Bind to window so nothing slips through split scopes
+window.poltra_gets_gun = poltra_gets_gun;
+window.poltra_with_gun = poltra_with_gun;
+window.lazer_bullet = lazer_bullet;

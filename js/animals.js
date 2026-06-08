@@ -1,7 +1,6 @@
 import { gameState, ctx, CANVAS_WIDTH, CANVAS_HEIGHT } from './state.js';
 import { checkCollision } from './helpers.js';
 import { player } from './player.js';
-// 🎯 FIX: Split imports correctly so images load from assets and audio loads from audio!
 import { pigIdle, pigWalk, chickenSprite, spaceCowSprite } from './assets.js';
 import { watermelonPickupSound } from './audio.js';
 
