@@ -44,6 +44,10 @@ function setupConnection(conn) {
                     masterAlien.y = 1250;
                     masterAlien.speed = 0; 
                     masterAlien.isLocallyControlled = true; 
+                    
+                    masterAlien.hasGun = false;       
+                    masterAlien.pickupDone = false;
+                    
                     gameState.enemies.push(masterAlien);
                 }
             }
@@ -66,6 +70,30 @@ function setupConnection(conn) {
                 }
             }
 
+            if (data.type === 'ALIEN_MANUAL_FIRE') {
+                let shooter = gameState.enemies.find(e => e.id === data.id);
+                if (shooter && !shooter.isDying) {
+                    if (!shooter.lastManualFire) shooter.lastManualFire = 0;
+                    if (Date.now() - shooter.lastManualFire > 500) { 
+                        let dx = data.tx - shooter.x;
+                        let dy = data.ty - shooter.y;
+                        let angle = Math.atan2(dy, dx);
+                        let laserSpeed = 5; 
+
+                        if (!gameState.enemyLasers) gameState.enemyLasers = [];
+                        gameState.enemyLasers.push({
+                            x: shooter.x + 144,
+                            y: shooter.y + 144,
+                            vX: Math.cos(angle) * laserSpeed,
+                            vY: Math.sin(angle) * laserSpeed,
+                            width: 90,
+                            height: 90
+                        });
+                        shooter.lastManualFire = Date.now();
+                    }
+                }
+            }
+
             if (data.type === 'SEED_STOLEN') {
                 let possible = [1];
                 if (gameState.enemyKillScore >= 20) possible.push(2);
@@ -75,9 +103,11 @@ function setupConnection(conn) {
                 let uncontrolledAlien = createEnemy(chosenType);
                 
                 if (uncontrolledAlien) {
+                    uncontrolledAlien.id = `stolen-seed-spawn-${Math.floor(Math.random() * 9999999)}`;
                     uncontrolledAlien.isLocallyControlled = false; 
+                    
                     gameState.enemies.push(uncontrolledAlien);
-                    console.log(`📡 SEED STOLEN: Uncontrolled Level ${chosenType} deployed.`);
+                    console.log(`📡 SEED STOLEN: Deployed Unique Level ${chosenType} Grunt (ID: ${uncontrolledAlien.id})`);
                 }
             }
 
@@ -114,41 +144,32 @@ function setupConnection(conn) {
                             fIdx: 0,
                             fT: 0,
                             isDying: ne.isDying,
-                            health: 5,
+                            health: ne.health,
                             width: 288,
-                            height: 288
+                            height: 288,
+                            hasGun: ne.hasGun ? true : false,
+                            pickupDone: ne.pickupDone ? true : false
                         };
                         gameState.enemies.push(localEn);
                     } else {
                         localEn.targetX = ne.x;
                         localEn.targetY = ne.y;
                         localEn.isDying = ne.isDying;
+                        localEn.hasGun = ne.hasGun ? true : false;
+                        localEn.pickupDone = ne.pickupDone ? true : false;
                     }
                 });
                 
                 gameState.enemies = gameState.enemies.filter(le => data.enemies.some(ne => ne.id === le.id) || le.id === gameState.controlledEnemyId);
             }
-            if (data.type === 'SYNC_FARMER') {
-                gameState.playerX = parseInt(data.playerX);
-                gameState.playerY = parseInt(data.playerY);
-                gameState.plowedPatches = data.plowedPatches || [];
-                gameState.plantedWatermelons = data.plantedWatermelons || [];
-                gameState.seeds = data.seeds || [];
-                gameState.pigs = data.pigs || [];
-                gameState.chickens = data.chickens || [];
-                gameState.charms = data.charms || [];
-                gameState.grenadesOnGround = data.grenadesOnGround || [];
-                gameState.activeGrenades = data.activeGrenades || [];
-                gameState.carryingGrenade = data.carryingGrenade;
-                gameState.guns = data.guns || [];
+            
+            // 🏎️ FAST LANE TRAFFIC INGEST
+            if (data.type === 'SYNC_FARMER_FAST') {
+                gameState.targetPlayerX = parseInt(data.playerX); 
+                gameState.targetPlayerY = parseInt(data.playerY);
                 gameState.activeSlot = parseInt(data.activeSlot) || 0;
-                gameState.inventory = data.inventory;
-                gameState.hasScythe = data.hasScythe;
-                
-                // ROCKET FUEL NETWORK INTERCEPT: Read incoming value from host data packets
-                if (data.rocketFuel !== undefined) {
-                    gameState.rocketFuel = data.rocketFuel;
-                }
+                gameState.hasGun = data.hasGun;
+                gameState.enemyLasers = data.enemyLasers || [];
                 
                 if (data.isShooting) {
                     gameState.isShooting = true;
@@ -163,7 +184,30 @@ function setupConnection(conn) {
                 } else {
                     try { moveSound.pause(); } catch(e) {}
                 }
-                gameState.hasGun = data.hasGun;
+            }
+
+            // 🐌 SLOW LANE TRAFFIC INGEST
+            if (data.type === 'SYNC_FARMER_SLOW') {
+                gameState.plowedPatches = data.plowedPatches || [];
+                gameState.plantedWatermelons = data.plantedWatermelons || [];
+                gameState.seeds = data.seeds || [];
+                gameState.tires = data.tires || [];
+                if (data.corral) {
+                    gameState.corral = data.corral;
+                }
+                gameState.pigs = data.pigs || [];
+                gameState.chickens = data.chickens || [];
+                gameState.charms = data.charms || [];
+                gameState.grenadesOnGround = data.grenadesOnGround || [];
+                gameState.activeGrenades = data.activeGrenades || [];
+                gameState.carryingGrenade = data.carryingGrenade;
+                gameState.guns = data.guns || [];
+                gameState.inventory = data.inventory;
+                gameState.hasScythe = data.hasScythe;
+                
+                if (data.rocketFuel !== undefined) {
+                    gameState.rocketFuel = data.rocketFuel;
+                }
             }
         }
     });

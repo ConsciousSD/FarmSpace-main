@@ -39,7 +39,9 @@ export function createEnemy(type = 1) {
         speed: type === 1 ? 2 : (type === 2 ? 2.4 : 3.5),
         health: type === 2 ? 5 : 1,
         fIdx: 0, fT: 0, hitboxOffsetX: 90, hitboxOffsetY: 90,
-        isDying: false, deathFrame: 0, deathTimer: 0
+        isDying: false, deathFrame: 0, deathTimer: 0,
+
+        hasGun:false
     };
 }
 
