@@ -49,6 +49,12 @@ export function updateAndDrawAnimals() {
         gameState.pigs.splice(gameState.pigs.indexOf(gameState.carryingPig), 1); 
         gameState.carryingPig = null; 
         gameState.pigsSaved++;
+        
+        // 💰 REWARD: +5 Coins for saving a Space Pig
+        if (gameState.coins === undefined) gameState.coins = 0;
+        gameState.coins += 5;
+        console.log(`Earned 5 credits! Total: ${gameState.coins}`);
+
         watermelonPickupSound.play().catch(() => { });
         gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
     }
@@ -56,6 +62,12 @@ export function updateAndDrawAnimals() {
         gameState.chickens.splice(gameState.chickens.indexOf(gameState.carryingChicken), 1); 
         gameState.carryingChicken = null; 
         gameState.chickensSaved++;
+        
+        // 💰 REWARD: +2 Coins for saving a Space Chicken
+        if (gameState.coins === undefined) gameState.coins = 0;
+        gameState.coins += 2;
+        console.log(`Earned 2 credits! Total: ${gameState.coins}`);
+
         watermelonPickupSound.play().catch(() => { });
         gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
     }

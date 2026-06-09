@@ -8,6 +8,7 @@ import { initMultiplayer } from './network.js';
 // 🎯 MODULAR COMPONENTS INTERFACE IMPORTS
 import { updateAndDrawEnemies, createEnemyData } from './enemies.js';
 import { updateAndDrawAnimals } from './animals.js';
+import { renderShop, switchShopTab } from './shop.js';
 
 // Global reference array to completely track and destroy intervals on reset
 let gameIntervals = [];
@@ -652,7 +653,6 @@ export function checkForUpdates() {
 function showUpdateNotification(newVersion) {
     alert(`A new patch update (v${newVersion}) is live! Please download the latest compressed .zip bundle from your host provider to apply the latest mechanics and stability improvements.`);
 }
-
 // --- DOM SAFE INITIALIZATION WRAPPER ---
 document.addEventListener('DOMContentLoaded', () => {
     // 🚀 FIRING AUTOMATED VERSION CHECK INSTANTLY ON ENGINE WAKEUP
@@ -699,6 +699,63 @@ document.addEventListener('DOMContentLoaded', () => {
             initInput();
             gameLoop();
             dispatchMasterVesselSpawn();
+        });
+    }
+
+    // =======================================================
+    // 🛒 SPACE CANTINA OPERATIONAL TRIGGERS
+    // =======================================================
+    const shopScreen = document.getElementById('shop-screen');
+    const openShopBtn = document.getElementById('open-shop-btn');
+    const closeShopBtn = document.getElementById('close-shop-btn');
+    const tabSkinBtn = document.getElementById('tab-skin-btn');
+    const tabWeaponBtn = document.getElementById('tab-weapon-btn');
+    const tabPowerupBtn = document.getElementById('tab-powerup-btn');
+
+    function openCantina() {
+        gameState.isPaused = true;
+        if (shopScreen) shopScreen.style.display = 'block';
+        // Dynamically imported from shop.js
+        renderShop();
+    }
+
+    function closeCantina() {
+        if (shopScreen) shopScreen.style.display = 'none';
+        gameState.isPaused = false;
+    }
+
+    if (openShopBtn) openShopBtn.addEventListener('click', openCantina);
+    if (closeShopBtn) closeShopBtn.addEventListener('click', closeCantina);
+
+    // Visual helper to reset active tab selection states seamlessly
+    function updateActiveTabStyle(activeBtn) {
+        [tabSkinBtn, tabWeaponBtn, tabPowerupBtn].forEach(btn => {
+            if (!btn) return;
+            btn.style.background = 'transparent';
+            btn.style.color = '#ffd700';
+        });
+        if (activeBtn) {
+            activeBtn.style.background = '#ffd700';
+            activeBtn.style.color = 'black';
+        }
+    }
+
+    if (tabSkinBtn) {
+        tabSkinBtn.addEventListener('click', () => {
+            switchShopTab('skin');
+            updateActiveTabStyle(tabSkinBtn);
+        });
+    }
+    if (tabWeaponBtn) {
+        tabWeaponBtn.addEventListener('click', () => {
+            switchShopTab('weapon');
+            updateActiveTabStyle(tabWeaponBtn);
+        });
+    }
+    if (tabPowerupBtn) {
+        tabPowerupBtn.addEventListener('click', () => {
+            switchShopTab('powerup');
+            updateActiveTabStyle(tabPowerupBtn);
         });
     }
 

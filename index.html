@@ -9,7 +9,10 @@
 <body>
     <img id="farmer" src="assets/farmer.png" alt="Farmer" class="hidden-asset">
     
-    <button id="help-button">📄 How to Play</button>
+    <div id="header-controls">
+        <button id="help-button">📄 How to Play</button>
+        <button id="open-shop-btn">🛒 SPACE CANTINA</button>
+    </div>
     
     <canvas id="canvas1"></canvas>
     
@@ -34,6 +37,28 @@
                 <button id="join-master-btn">🛸 Join (Alien Master)</button>
             </div>
         </div>
+    </div>
+
+    <div id="shop-screen">
+        
+        <h1 class="cantina-title">🛸 THE SPACE CANTINA 🌾</h1>
+        <p class="cantina-subtitle">Secure Galactic Trade Terminal</p>
+        
+        <div class="cantina-balance-box">
+            <span class="cantina-balance-text">Rescue Registry Credits: <span id="shop-coin-count">0</span> 💰</span>
+        </div>
+
+        <div class="cantina-tabs-container">
+            <button class="shop-tab-btn active-tab" id="tab-skin-btn">SKINS</button>
+            <button class="shop-tab-btn" id="tab-weapon-btn">WEAPONS</button>
+            <button class="shop-tab-btn" id="tab-powerup-btn">POWER-UPS</button>
+        </div>
+
+        <div id="shop-items-container">
+            </div>
+
+        <br><br>
+        <button id="close-shop-btn">Return to Field</button>
     </div>
 
     <div id="instructions-modal" class="modal-overlay">

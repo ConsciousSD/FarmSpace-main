@@ -68,10 +68,6 @@
 
 /* Trigger Button Design */
 #help-button {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 30;
     padding: 12px 24px;
     background: #e6b428;
     border: none;
@@ -212,7 +208,7 @@
 }
 
 /* ==========================================
-   ADDED: ELECTRON APP DESKTOP CONFIGURATIONS 
+   ELECTRON APP DESKTOP CONFIGURATIONS 
    ========================================== */
 
 /* Safety asset hiding rule */
@@ -248,4 +244,145 @@
     letter-spacing: 2px;
     font-weight: bold;
     pointer-events: none; /* Ensures players can't accidentally click it */
+}
+
+/* =======================================================
+   🛒 THE SPACE CANTINA STOREFRONT STYLES
+   ======================================================= */
+
+#header-controls {
+    position: absolute; 
+    top: 10px; 
+    left: 10px; 
+    display: flex; 
+    gap: 10px; 
+    z-index: 30; /* Matches header layering depth values */
+}
+
+#open-shop-btn {
+    background: #a855f7; 
+    color: white; 
+    border: 2px solid #ffd700; 
+    border-radius: 4px; 
+    padding: 6px 12px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+    font-family: 'Arial', sans-serif;
+    transition: transform 0.1s;
+}
+
+#open-shop-btn:hover {
+    transform: scale(1.05);
+}
+
+#shop-screen {
+    display: none; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    background: rgba(10, 12, 26, 0.96); 
+    color: white; 
+    font-family: 'Courier New', Courier, monospace; 
+    text-align: center; 
+    z-index: 100; 
+    box-sizing: border-box; 
+    padding: 40px;
+}
+
+.cantina-title {
+    font-size: 55px; 
+    color: #ffd700; 
+    margin: 10px 0 5px 0; 
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+}
+
+.cantina-subtitle {
+    font-size: 20px; 
+    color: #a855f7; 
+    margin-bottom: 25px;
+}
+
+.cantina-balance-box {
+    background: rgba(255, 255, 255, 0.05); 
+    border: 1px solid #00ffff; 
+    display: inline-block; 
+    padding: 10px 30px; 
+    border-radius: 8px; 
+    margin-bottom: 30px;
+}
+
+.cantina-balance-text {
+    font-size: 22px; 
+    color: #00ffff; 
+    font-weight: bold;
+}
+
+.cantina-tabs-container {
+    display: flex; 
+    justify-content: center; 
+    gap: 20px; 
+    margin-bottom: 40px;
+}
+
+/* Category Selection Navigation Buttons */
+.shop-tab-btn {
+    padding: 12px 35px; 
+    font-size: 18px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    border: 2px solid #ffd700; 
+    background: transparent; 
+    color: #ffd700; 
+    border-radius: 6px;
+    font-family: inherit;
+    transition: background 0.2s, color 0.2s;
+}
+
+.shop-tab-btn:hover {
+    background: rgba(255, 215, 0, 0.1);
+}
+
+/* State when tab is actively selected */
+.shop-tab-btn.active-tab {
+    background: #ffd700; 
+    color: black;
+}
+
+/* Dynamic Item Cards Display Grid */
+#shop-items-container {
+    display: flex; 
+    justify-content: center; 
+    gap: 25px; 
+    min-height: 320px; 
+    flex-wrap: wrap; 
+    padding: 10px; 
+    overflow-y: auto; 
+    max-height: 450px;
+}
+
+/* Footer Return Control Button */
+#close-shop-btn {
+    padding: 15px 50px; 
+    font-size: 20px; 
+    background: #ef4444; 
+    color: white; 
+    border: none; 
+    border-radius: 8px; 
+    cursor: pointer; 
+    font-weight: bold; 
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); 
+    font-family: inherit;
+    transition: transform 0.1s, background-color 0.2s;
+}
+
+#close-shop-btn:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+}
+
+#close-shop-btn:active {
+    transform: translateY(0);
 }
