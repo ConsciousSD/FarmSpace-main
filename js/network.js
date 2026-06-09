@@ -164,7 +164,8 @@ function setupConnection(conn) {
             }
             
             // 🏎️ FAST LANE TRAFFIC INGEST
-            if (data.type === 'SYNC_FARMER_FAST') {
+            // 🎯 FIXED: Changed 'SYNC_FARMER_FAST' to 'SYNC_FARMER' to properly read incoming host coordinates
+            if (data.type === 'SYNC_FARMER') {
                 gameState.targetPlayerX = parseInt(data.playerX); 
                 gameState.targetPlayerY = parseInt(data.playerY);
                 gameState.activeSlot = parseInt(data.activeSlot) || 0;
