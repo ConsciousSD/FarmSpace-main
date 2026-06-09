@@ -3,7 +3,7 @@ import { initInput } from './input.js';
 import { player } from './player.js';
 import { checkCollision, triggerGameOver } from './helpers.js';
 import { gameAudio, moveSound, shootSound, seedPickupSound, grenadeExplosionSound, tirePickupSound, watermelonPickupSound } from './audio.js';
-import { corralSprite, grenadeSprite, scytheSprite, seedSprite, tireSprite, ak47Idle, watermelonSprite, charmSprite } from './assets.js';
+import { corralSprite, grenadeSprite, scytheSprite, serpentSword, seedSprite, tireSprite, ak47Idle, watermelonSprite, charmSprite } from './assets.js';
 import { initMultiplayer } from './network.js';
 // 🎯 MODULAR COMPONENTS INTERFACE IMPORTS
 import { updateAndDrawEnemies, createEnemyData } from './enemies.js';
@@ -13,8 +13,17 @@ import { renderShop, switchShopTab } from './shop.js';
 // Global reference array to completely track and destroy intervals on reset
 let gameIntervals = [];
 
-// Initialize damage number tracker array globally if not present in baseline state
-if (!gameState.damageNumbers) gameState.damageNumbers = [];
+// Initialize damage number tracker array baseline safety check
+gameState.damageNumbers = gameState.damageNumbers || [];
+
+// Initialize serpent sword stability parameters if not already declared in state.js
+gameState.maxSwordDurability = 10;
+gameState.swordCooldownActive = false;
+gameState.swordCooldownTimer = 0;
+
+if (gameState.swordDurability === undefined) {
+    gameState.swordDurability = gameState.maxSwordDurability;
+}
 
 // Setup difficulty scaling intervals
 setInterval(() => {
@@ -24,12 +33,15 @@ setInterval(() => {
 }, 60000);
 
 // Helper function to spin up a floating particle number over a target
-function createDamageNumber(x, y, amount, isCritical = false) {
+function createDamageNumber(x, y, amount, isCritical = false, isVenom = false) {
+    let textColor = isCritical ? '#ffd700' : '#00ffff'; // Gold for crit/coins/XP, Cyan for base
+    if (isVenom) textColor = '#22c55e'; // 🎯 Venomous Green for sword strikes!
+    
     gameState.damageNumbers.push({
         x: x + Math.random() * 60 - 30,
         y: y - 10,
         text: amount,
-        color: isCritical ? '#ffcc00' : '#00ffff',
+        color: textColor,
         size: isCritical ? 38 : 28,
         alpha: 1.0,
         vY: -2.5 - Math.random() * 1.5
@@ -113,6 +125,11 @@ export function resetGameSession() {
     gameState.hasGun = false;
     gameState.gunCoolDownActive = false;
     gameState.killsSinceEmpty = 0;
+    
+    // Reset sword cooldown states
+    gameState.swordDurability = gameState.maxSwordDurability;
+    gameState.swordCooldownActive = false;
+    gameState.swordCooldownTimer = 0;
 
     gameState.playerHealth = 3;
     gameState.isInvincible = false;
@@ -168,6 +185,13 @@ function gameLoop() {
 
     if (gameState.isInvincible && Date.now() > gameState.invincibilityTimer) {
         gameState.isInvincible = false;
+    }
+
+    // 🎯 LIVE SWORD COOLDOWN TIMER CHECK ENGINE
+    if (gameState.swordCooldownActive && Date.now() >= gameState.swordCooldownTimer) {
+        gameState.swordCooldownActive = false;
+        gameState.swordDurability = gameState.maxSwordDurability;
+        console.log("🐍 The Serpent Sword has recharged and materialized back in your active loadout!");
     }
 
     // --- BASE BACKGROUND LAYER ---
@@ -243,8 +267,28 @@ function gameLoop() {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'; ctx.font = '22px Arial'; ctx.fillText(j + 1, boxX + 8, startY + 24);
 
         let item = gameState.inventory[j];
-        if (item === 'scythe') ctx.drawImage(scytheSprite, boxX + 10, startY + 10, boxSize - 20, boxSize - 20);
-        else if (item === 'gun') ctx.drawImage(ak47Idle, boxX + 5, startY + 5, boxSize - 10, boxSize - 10);
+        if (item === 'scythe') {
+            ctx.drawImage(scytheSprite, boxX + 10, startY + 10, boxSize - 20, boxSize - 20);
+        } else if (item === 'gun') {
+            ctx.drawImage(ak47Idle, boxX + 5, startY + 5, boxSize - 10, boxSize - 10);
+        } 
+        // 🎯🪐 SERPENT SWORD HUD SLOT DRAW ROUTINE
+        else if (item === 'serpent_sword' || (gameState.selectedWeapon === 'serpent_sword' && j === 1)) {
+            // Only draw visual item thumbnail if it's not currently charging/shattered
+            if (!gameState.swordCooldownActive) {
+                ctx.drawImage(serpentSword, boxX + 10, startY + 10, boxSize - 20, boxSize - 20);
+            } else {
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                let remaining = Math.max(0, Math.ceil((gameState.swordCooldownTimer - Date.now()) / 1000));
+                ctx.fillText(`${remaining}s`, boxX + (boxSize / 2), startY + (boxSize / 2) + 6);
+            }
+            
+            if (gameState.inventory[1] !== 'serpent_sword') {
+                gameState.inventory[1] = 'serpent_sword';
+            }
+        }
     }
 
     drawRocketFuelBar();
@@ -267,8 +311,8 @@ function gameLoop() {
         ctx.fillStyle = 'white'; ctx.font = '60px Arial';
         ctx.fillText('The Rocket is Fueled! You Escaped the Alien Horde!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
         ctx.fillStyle = '#66ff66'; ctx.font = '50px Arial';
-        ctx.fillText(`Aliens Neutralized: ${gameState.enemyKillScore}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70);
-        ctx.fillText(`Pigs Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 140);
+        ctx.fillText(`Aliens Neutralized: ${gameState.enemyKillScore} | Wealth: ${gameState.coins || 0} Coins`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70);
+        ctx.fillText(`Pigs Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved} | Level Rank: ${gameState.xp || 0} XP`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 140);
         ctx.fillStyle = 'white'; ctx.font = '45px Arial';
         ctx.fillText('Press [ R ] to Play Again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
         ctx.fillStyle = '#00ffff';
@@ -281,8 +325,8 @@ function gameLoop() {
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         ctx.textAlign = 'center'; ctx.fillStyle = 'white'; ctx.font = 'bold 160px Arial';
         ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 150);
-        ctx.font = '70px Arial'; ctx.fillText(`Kills: ${gameState.enemyKillScore} (Best: ${gameState.highScore})`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
-        ctx.fillStyle = '#66ff66'; ctx.fillText(`Pigs Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 100);
+        ctx.font = '70px Arial'; ctx.fillText(`Kills: ${gameState.enemyKillScore} | Bank: ${gameState.coins || 0} Coins`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+        ctx.fillStyle = '#66ff66'; ctx.fillText(`Pigs Saved: ${gameState.pigsSaved} | Chickens: ${gameState.chickensSaved} | Score: ${gameState.xp || 0} XP`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 100);
         ctx.fillStyle = 'white'; ctx.font = '50px Arial';
         ctx.fillText('Press [ R ] to Restart Session', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 250);
         ctx.fillStyle = '#00ffff';
@@ -292,7 +336,9 @@ function gameLoop() {
     }
 
     if (gameState.isPowered && Date.now() - gameState.powerTimer > 10000) gameState.isPowered = false;
-    let speed = gameState.isPowered ? 12 : 6;
+    let baseSpeed = gameState.isPowered ? 12 : 6;
+    let speed = baseSpeed * (gameState.playerSpeedModifier || 1.0);
+    
     if (gameState.moveLeft) gameState.playerX -= speed; if (gameState.moveRight) gameState.playerX += speed;
     if (gameState.moveUp) gameState.playerY -= speed; if (gameState.moveDown) gameState.playerY += speed;
     gameState.playerX = Math.max(0, Math.min(CANVAS_WIDTH - 288, gameState.playerX));
@@ -443,15 +489,23 @@ function gameLoop() {
     // =======================================================
     // 🎯 MODULAR LIVESTOCK ENGINE SUB-LAYER INTEGRATION
     // =======================================================
-    updateAndDrawAnimals();
+    updateAndDrawAnimals(createDamageNumber);
 
+    // --- CHARM REWARD UPDATE PASS ---
     gameState.charms.forEach((charm, i) => {
         let bobbing = Math.sin(gameState.gameFrame * 0.08) * 12;
         ctx.drawImage(charmSprite, charm.x, charm.y + bobbing, charm.width, charm.height);
         if (checkCollision(player, { x: charm.x, y: charm.y, width: charm.width, height: charm.height }, true)) {
             gameState.charms.splice(i, 1);
             seedPickupSound.play().catch(() => { });
+            
+            // 🎯 EXPERIENCE REWARD ASSIGNMENT
             gameState.enemyKillScore += 5;
+            gameState.xp = (gameState.xp || 0) + 25; 
+            
+            localStorage.setItem('farmSpaceXP', gameState.xp);
+            
+            createDamageNumber(charm.x + 60, charm.y, "+25 XP", true);
         }
     });
 
@@ -528,7 +582,7 @@ function gameLoop() {
             if (Date.now() >= gameState.alienRespawnTimer) { dispatchMasterVesselSpawn(); }
         }
     } else {
-        ctx.fillText(`Seeds: ${gameState.seedInventory} | Kills: ${gameState.enemyKillScore} | Saved: ${gameState.pigsSaved}`, 30, 60);
+        ctx.fillText(`Coins: ${gameState.coins || 0} | XP: ${gameState.xp || 0} | Saved: ${gameState.pigsSaved}`, 30, 60);
         if (gameState.playerRole === 'farmer') {
             let heartX = 680; let heartY = 55;
             for (let h = 0; h < gameState.maxPlayerHealth; h++) {
@@ -545,8 +599,25 @@ function gameLoop() {
         ctx.fillStyle = 'orange'; ctx.fillText(`RELOADING: ${gameState.killsSinceEmpty}/10 Kills`, 30, 135);
     }
     if (gameState.hasScythe) {
-        ctx.fillStyle = 'white'; ctx.fillText("SCYTHE:", 30, 210); ctx.fillStyle = 'black'; ctx.fillRect(210, 185, 200, 30);
-        let durPct = gameState.scytheDurability / gameState.maxScytheDurability; ctx.fillStyle = durPct > 0.35 ? '#00bfff' : '#FFaa00'; ctx.fillRect(210, 185, 200 * durPct, 30);
+        ctx.fillStyle = 'white'; ctx.fillText("SCYTHE:", 30, 135); ctx.fillStyle = 'black'; ctx.fillRect(210, 110, 200, 30);
+        let durPct = gameState.scytheDurability / gameState.maxScytheDurability; ctx.fillStyle = durPct > 0.35 ? '#00bfff' : '#FFaa00'; ctx.fillRect(210, 110, 200 * durPct, 30);
+    }
+    
+    // 🎯 SERPENT SWORD DURABILITY HUD METER BAR
+    let activeWeapon = gameState.inventory[gameState.activeSlot];
+    if (activeWeapon === 'serpent_sword' || (gameState.selectedWeapon === 'serpent_sword' && gameState.activeSlot === 1)) {
+        ctx.fillStyle = '#22c55e'; ctx.fillText("SWORD:", 30, 210); ctx.fillStyle = 'black'; ctx.fillRect(210, 185, 200, 30);
+        
+        if (gameState.swordCooldownActive) {
+            // Visual text alert showing reload loop directly over empty meter bar
+            let remaining = Math.max(0, Math.ceil((gameState.swordCooldownTimer - Date.now()) / 1000));
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '28px Arial';
+            ctx.fillText(`MATERIALIZING: ${remaining}s`, 430, 210);
+        } else {
+            let swordPct = Math.max(0, gameState.swordDurability / gameState.maxSwordDurability);
+            ctx.fillStyle = swordPct > 0.3 ? '#22c55e' : '#ef4444'; ctx.fillRect(210, 185, 200 * swordPct, 30);
+        }
     }
 
     // --- NETWORK CHANNEL INTERFACE HANDSHAKE payload ---
@@ -570,7 +641,7 @@ function gameLoop() {
                 charms: gameState.charms.map(ch => ({ x: ch.x, y: ch.y, width: ch.width, height: ch.height })),
                 grenadesOnGround: gameState.grenadesOnGround.map(g => ({ x: g.x, y: g.y })), activeGrenades: gameState.activeGrenades.map(ag => ({ x: ag.x, y: ag.y, exploded: ag.exploded })),
                 carryingGrenade: gameState.carryingGrenade ? true : false, guns: gameState.guns.map(gu => ({ x: gu.x, y: gu.y })), activeSlot: parseInt(gameState.activeSlot) || 0,
-                inventory: gameState.inventory, hasScythe: gameState.hasScythe, hasGun: gameState.hasGun, rocketFuel: gameState.rocketFuel, playerHealth: gameState.playerHealth
+                inventory: gameState.inventory, hasScythe: gameState.hasScythe, hasGun: gameState.hasGun, rocketFuel: gameState.rocketFuel, playerHealth: gameState.playerHealth, coins: gameState.coins
             });
         } catch (e) { }
     }
@@ -630,7 +701,6 @@ function startTrackingIntervals() {
 export function checkForUpdates() {
     const currentVersion = "1.0.1"; // Matches your hardcoded app snapshot version
     const versionUrl = "https://conscioussd.github.io/FarmSpace-main/version.txt";
-    // 🎯 ADD THIS LINE HERE: Dynamically writes the current version onto the menu screen
     const versionDisplay = document.getElementById('version-display');
     if (versionDisplay) versionDisplay.innerText = `v${currentVersion}`;
     fetch(versionUrl)
@@ -653,9 +723,9 @@ export function checkForUpdates() {
 function showUpdateNotification(newVersion) {
     alert(`A new patch update (v${newVersion}) is live! Please download the latest compressed .zip bundle from your host provider to apply the latest mechanics and stability improvements.`);
 }
+
 // --- DOM SAFE INITIALIZATION WRAPPER ---
 document.addEventListener('DOMContentLoaded', () => {
-    // 🚀 FIRING AUTOMATED VERSION CHECK INSTANTLY ON ENGINE WAKEUP
     checkForUpdates();
 
     const startButton = document.getElementById('start-button');
@@ -663,11 +733,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const hostFarmerBtn = document.getElementById('host-farmer-btn');
     const joinMasterBtn = document.getElementById('join-master-btn');
     const roomCodeInput = document.getElementById('room-code-input');
+    const shopScreen = document.getElementById('shop-screen');
+    const openShopBtn = document.getElementById('open-shop-btn');
+    const closeShopBtn = document.getElementById('close-shop-btn');
+    const tabSkinBtn = document.getElementById('tab-skin-btn');
+    const tabWeaponBtn = document.getElementById('tab-weapon-btn');
+    const tabPowerupBtn = document.getElementById('tab-powerup-btn');
 
-    // Define startGame inside the DOM wrapper so it has perfect access to everything
     function startGame() {
         if (!startScreen || startScreen.style.display === 'none') return;
+
         startScreen.style.display = 'none';
+        if (shopScreen) shopScreen.style.display = 'none';
+        if (openShopBtn) openShopBtn.style.display = 'none';
+        if (closeShopBtn) closeShopBtn.style.display = 'none';
+
+        // 🎯 CLEAR FLOATING UI: Scans and completely clears any elements holding menu text
+        document.querySelectorAll('button, div, p, a').forEach(el => {
+            if (el.innerText && el.innerText.toLowerCase().includes('how to play')) {
+                el.style.display = 'none';
+            }
+        });
+
+        const floatingInstructions = document.getElementById('instructions-screen') || document.getElementById('instructions');
+        if (floatingInstructions) floatingInstructions.style.display = 'none';
+
+        const floatingTitle = document.getElementById('game-title') || document.getElementById('main-header');
+        if (floatingTitle) floatingTitle.style.display = 'none';
+
         gameAudio.play().catch(e => console.log("Audio blocked"));
         initInput();
         spawnTick();
@@ -676,7 +769,7 @@ document.addEventListener('DOMContentLoaded', () => {
         startTrackingIntervals();
         gameLoop();
     }
-
+    
     if (startButton) {
         startButton.addEventListener('click', startGame);
     }
@@ -696,6 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!roomCode) return alert("Please enter a room code first!");
             initMultiplayer('alien-master', roomCode);
             if (startScreen) startScreen.style.display = 'none';
+            if (shopScreen) shopScreen.style.display = 'none';
             initInput();
             gameLoop();
             dispatchMasterVesselSpawn();
@@ -705,17 +799,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // =======================================================
     // 🛒 SPACE CANTINA OPERATIONAL TRIGGERS
     // =======================================================
-    const shopScreen = document.getElementById('shop-screen');
-    const openShopBtn = document.getElementById('open-shop-btn');
-    const closeShopBtn = document.getElementById('close-shop-btn');
-    const tabSkinBtn = document.getElementById('tab-skin-btn');
-    const tabWeaponBtn = document.getElementById('tab-weapon-btn');
-    const tabPowerupBtn = document.getElementById('tab-powerup-btn');
-
     function openCantina() {
         gameState.isPaused = true;
         if (shopScreen) shopScreen.style.display = 'block';
-        // Dynamically imported from shop.js
+        
+        // 🎯 REAL-TIME LINK: Automatically loads and synchronizes your wallet totals to the shop UI layout card elements
         renderShop();
     }
 
@@ -727,7 +815,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (openShopBtn) openShopBtn.addEventListener('click', openCantina);
     if (closeShopBtn) closeShopBtn.addEventListener('click', closeCantina);
 
-    // Visual helper to reset active tab selection states seamlessly
     function updateActiveTabStyle(activeBtn) {
         [tabSkinBtn, tabWeaponBtn, tabPowerupBtn].forEach(btn => {
             if (!btn) return;
@@ -764,6 +851,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') {
             startGame();
         }
+        
+        // 🎯 FIXED RESET LOOP: Listens to [R] but keeps wallet data safe
         if (e.key === 'r' || e.key === 'R' || e.keyCode === 82) {
             if (gameState.isGameOver || gameState.isGameWon) {
                 console.log("🎯 R Key registered cleanly.");
@@ -772,6 +861,123 @@ document.addEventListener('DOMContentLoaded', () => {
                     try { gameState.peerConnection.send({ type: 'REMOTE_SOFT_RESET' }); } catch (err) { }
                 }
                 resetGameSession();
+            }
+        }
+        
+        // =======================================================
+        // 🎯🪐 SERPENT SWORD ATTACK DRIVER [ S KEY ]
+        // =======================================================
+        if ((e.key === 's' || e.key === 'S' || e.keyCode === 83) && !gameState.isPaused && !gameState.isGameOver) {
+            let activeWeapon = gameState.inventory[gameState.activeSlot];
+            if ((activeWeapon === 'serpent_sword' || (gameState.selectedWeapon === 'serpent_sword' && gameState.activeSlot === 1)) && gameState.playerRole === 'farmer') {
+                
+                // Block attack if blade has shattered and is recharging
+                if (gameState.swordCooldownActive || (gameState.swordDurability || 0) <= 0) {
+                    console.log("💥 Sword is broken! Materializing... please wait.");
+                    return;
+                }
+                
+                gameState.enemies.forEach(en => {
+                    if (en.isDying) return;
+                    
+                    let distance = Math.hypot((en.x + 144) - (gameState.playerX + 144), (en.y + 144) - (gameState.playerY + 144));
+                    if (distance < 260) {
+                        let deltaX = en.x - gameState.playerX;
+                        if ((player.facingRight && deltaX > -50) || (!player.facingRight && deltaX < 50)) {
+                            if (!en.lastSwordStrikeTime) en.lastSwordStrikeTime = 0;
+                            if (Date.now() - en.lastSwordStrikeTime > 250) {
+                                let isMultiplayerBoss = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
+                                if (en.health === undefined) en.health = isMultiplayerBoss ? 50 : 10;
+                                
+                                let slashDamage = 3.5; 
+                                en.health -= slashDamage;
+                                en.lastSwordStrikeTime = Date.now();
+                                
+                                createDamageNumber(en.x + 144, en.y, `-${slashDamage} HP`, false, true);
+                                
+                                if (en.health <= 0) {
+                                    en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++;
+                                    if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++;
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Deduct durability point per swing attempt
+                gameState.swordDurability--;
+                if (gameState.swordDurability <= 0) {
+                    gameState.swordDurability = 0;
+                    
+                    // 🎯 START THE 15-SECOND COOLDOWN WINDOW INSTEAD OF SHATTERING OUTRIGHT!
+                    gameState.swordCooldownActive = true;
+                    gameState.swordCooldownTimer = Date.now() + 15000; 
+                    console.log("💥 Serpent Sword shattered! Commencing 15s materialization warp...");
+                }
+            }
+        }
+
+        // 🎯 OPERATIONAL [H] KEY ROUTER: Navigates cleanly back to start screens and restores menu buttons
+        if (e.key === 'h' || e.key === 'H' || e.keyCode === 72) {
+            if (gameState.isGameOver || gameState.isGameWon) {
+                console.log("🏠 H Key home menu route triggered safely.");
+                if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+                
+                // 1. Tear down active intervals on screen to avoid execution bleeding
+                gameIntervals.forEach(clearInterval);
+                gameIntervals = [];
+                clearTimeout(window.spawnTickTimeout);
+                try { moveSound.pause(); } catch (err) { }
+
+                // 2. Wipe all active field entity arrays so they don't linger on screen
+                gameState.enemies = [];
+                gameState.pigs = [];
+                gameState.chickens = [];
+                gameState.spaceCows = [];
+                gameState.charms = [];
+                gameState.damageNumbers = [];
+                gameState.activeGrenades = [];
+
+                // 3. CLEAR THE CANVAS LAYER
+                ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+                // 4. FIX START MENU CONTENT ALIGNMENT: Reset styles on the main panel and child inputs
+                if (startScreen) {
+                    startScreen.style.display = ''; 
+                    
+                    // Reset styling on child elements to ensure the form components don't shift positions
+                    const startBtn = document.getElementById('start-button');
+                    if (startBtn) startBtn.style.display = '';
+
+                    // Explicitly un-hide the multiplayer lobby fields and buttons inside the card
+                    const hostBtn = document.getElementById('host-farmer-btn');
+                    const joinBtn = document.getElementById('join-master-btn');
+                    const codeInput = document.getElementById('room-code-input');
+                    
+                    if (hostBtn) hostBtn.style.display = '';
+                    if (joinBtn) joinBtn.style.display = '';
+                    if (codeInput) codeInput.style.display = '';
+                }
+
+                // 5. Restore top navigation buttons
+                if (openShopBtn) openShopBtn.style.display = ''; 
+                
+                document.querySelectorAll('button, div, p, a').forEach(el => {
+                    if (el.innerText && el.innerText.toLowerCase().includes('how to play')) {
+                        el.style.display = ''; 
+                    }
+                });
+
+                const floatingInstructions = document.getElementById('instructions-screen') || document.getElementById('instructions');
+                if (floatingInstructions) floatingInstructions.style.display = '';
+
+                const floatingTitle = document.getElementById('game-title') || document.getElementById('main-header');
+                if (floatingTitle) floatingTitle.style.display = '';
+                
+                // 6. Freeze game ticks safely and reset state
+                gameState.isGameOver = false;
+                gameState.isGameWon = false;
+                gameState.isPaused = true; 
             }
         }
     });

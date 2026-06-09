@@ -35,3 +35,5 @@ lazer_bullet.src = 'assets/lazer_bullet.png';
 window.poltra_gets_gun = poltra_gets_gun;
 window.poltra_with_gun = poltra_with_gun;
 window.lazer_bullet = lazer_bullet;
+export const serpentSword = new Image();
+serpentSword.src = 'assets/serpentsword.png';

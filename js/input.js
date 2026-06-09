@@ -68,9 +68,18 @@ export function initInput() {
             gameState.hasScythe = (gameState.inventory[slotIndex] === 'scythe');
         }
 
+        // 🎯 UNIVERSAL S KEY COMBAT HUB ROUTER
         if (k === 's') {
-            if (gameState.inventory[gameState.activeSlot] === 'gun' && gameState.ammo > 0) {
-                gameState.isShooting = true; shootSound.play(); 
+            let activeWeapon = gameState.inventory[gameState.activeSlot];
+            
+            // Context A: Fire bullet streams if actively deploying the firearm
+            if (activeWeapon === 'gun' && gameState.ammo > 0) {
+                gameState.isShooting = true; 
+                shootSound.play(); 
+            } 
+            // Context B: Toggle the generic frame attack state flag if holding the Serpent Sword
+            else if (activeWeapon === 'serpent_sword' || (gameState.selectedWeapon === 'serpent_sword' && gameState.activeSlot === 1)) {
+                gameState.isShooting = true; 
             }
         }
 
@@ -145,7 +154,12 @@ export function initInput() {
         let k = e.key.toLowerCase();
         if (k === 'arrowup') gameState.moveUp = false; if (k === 'arrowdown') gameState.moveDown = false;
         if (k === 'arrowleft') gameState.moveLeft = false; if (k === 'arrowright') gameState.moveRight = false;
-        if (k === 's') { gameState.isShooting = false; shootSound.pause(); }
+        
+        if (k === 's') { 
+            gameState.isShooting = false; 
+            try { shootSound.pause(); } catch(err) {} 
+        }
+        
         if (k === 'd' && gameState.carryingGrenade) {
             gameState.carryingGrenade = false;
             gameState.activeGrenades.push({ x: gameState.playerX + 144, y: gameState.playerY + 144, vX: player.facingRight ? 18 : -18, vY: -12, timer: 50, exploded: false });

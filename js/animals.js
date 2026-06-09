@@ -4,7 +4,8 @@ import { player } from './player.js';
 import { pigIdle, pigWalk, chickenSprite, spaceCowSprite } from './assets.js';
 import { watermelonPickupSound } from './audio.js';
 
-export function updateAndDrawAnimals() {
+// 🎯 INTEGRATED ENGINE ARGUMENT: Added createDamageNumber hook interface
+export function updateAndDrawAnimals(createDamageNumber) {
     // --- 1. PIGS LAYER ---
     gameState.pigs.forEach((pig) => {
         if (pig === gameState.carryingPig) { 
@@ -46,6 +47,9 @@ export function updateAndDrawAnimals() {
 
     // --- 3. CORRAL DELIVERY DROP CHUTES ---
     if (gameState.carryingPig && checkCollision(player, gameState.corral)) {
+        const targetX = gameState.playerX + 144;
+        const targetY = gameState.playerY;
+
         gameState.pigs.splice(gameState.pigs.indexOf(gameState.carryingPig), 1); 
         gameState.carryingPig = null; 
         gameState.pigsSaved++;
@@ -53,12 +57,23 @@ export function updateAndDrawAnimals() {
         // 💰 REWARD: +5 Coins for saving a Space Pig
         if (gameState.coins === undefined) gameState.coins = 0;
         gameState.coins += 5;
+        
+        // 💾 PERSISTENCE HOOK: Write data out immediately to prevent run losses
+        localStorage.setItem('farmSpaceCoins', gameState.coins);
         console.log(`Earned 5 credits! Total: ${gameState.coins}`);
+        
+        // 🎯 VISUAL FEEDBACK: Trigger floating particle text!
+        if (typeof createDamageNumber === 'function') {
+            createDamageNumber(targetX, targetY, "+5 COINS", true);
+        }
 
         watermelonPickupSound.play().catch(() => { });
         gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });
     }
     if (gameState.carryingChicken && checkCollision(player, gameState.corral)) {
+        const targetX = gameState.playerX + 144;
+        const targetY = gameState.playerY;
+
         gameState.chickens.splice(gameState.chickens.indexOf(gameState.carryingChicken), 1); 
         gameState.carryingChicken = null; 
         gameState.chickensSaved++;
@@ -66,7 +81,15 @@ export function updateAndDrawAnimals() {
         // 💰 REWARD: +2 Coins for saving a Space Chicken
         if (gameState.coins === undefined) gameState.coins = 0;
         gameState.coins += 2;
+        
+        // 💾 PERSISTENCE HOOK: Write data out immediately to prevent run losses
+        localStorage.setItem('farmSpaceCoins', gameState.coins);
         console.log(`Earned 2 credits! Total: ${gameState.coins}`);
+        
+        // 🎯 VISUAL FEEDBACK: Trigger floating particle text!
+        if (typeof createDamageNumber === 'function') {
+            createDamageNumber(targetX, targetY, "+2 COINS", true);
+        }
 
         watermelonPickupSound.play().catch(() => { });
         gameState.charms.push({ x: gameState.corral.x + gameState.corral.width + 20, y: gameState.corral.y + (gameState.corral.height / 2) - 50, width: 120, height: 120 });

@@ -18,7 +18,7 @@ export function initMultiplayer(role, roomCode) {
         }
     });
 
-    peer.on('connection', (conn) => {
+    peer.on('peerConnection', (conn) => {
         setupConnection(conn);
     });
 }
@@ -45,7 +45,7 @@ function setupConnection(conn) {
                     masterAlien.speed = 0; 
                     masterAlien.isLocallyControlled = true; 
                     
-                    masterAlien.hasGun = false;       
+                    masterAlien.hasGun = false;      
                     masterAlien.pickupDone = false;
                     
                     gameState.enemies.push(masterAlien);
@@ -164,7 +164,6 @@ function setupConnection(conn) {
             }
             
             // 🏎️ FAST LANE TRAFFIC INGEST
-            // 🎯 FIXED: Changed 'SYNC_FARMER_FAST' to 'SYNC_FARMER' to properly read incoming host coordinates
             if (data.type === 'SYNC_FARMER') {
                 gameState.targetPlayerX = parseInt(data.playerX); 
                 gameState.targetPlayerY = parseInt(data.playerY);
@@ -172,6 +171,11 @@ function setupConnection(conn) {
                 gameState.hasGun = data.hasGun;
                 gameState.enemyLasers = data.enemyLasers || [];
                 
+                // 🎯 REWARD TRACKING INGEST: Links financial, experience, and custom loadouts to both connected screens!
+                gameState.coins = parseInt(data.coins) || 0;
+                gameState.xp = parseInt(data.xp) || 0;
+                gameState.selectedWeapon = data.selectedWeapon || null;
+
                 if (data.isShooting) {
                     gameState.isShooting = true;
                     if (shootSound.paused) shootSound.play().catch(() => {});
@@ -187,7 +191,7 @@ function setupConnection(conn) {
                 }
             }
 
-            // 🐌 SLOW LANE TRAFFIC INGEST
+            //  snails SLOW LANE TRAFFIC INGEST
             if (data.type === 'SYNC_FARMER_SLOW') {
                 gameState.plowedPatches = data.plowedPatches || [];
                 gameState.plantedWatermelons = data.plantedWatermelons || [];

@@ -12,6 +12,18 @@ export const gameState = {
     seedInventory: 0, enemyKillScore: 0, ammo: 0,
     hasGun: false, gunCoolDownActive: false, killsSinceEmpty: 0,
     isPowered: false, powerTimer: 0, isPaused: false, isGameOver: false,
+
+    // --- 🪙 SPACE CANTINA ECONOMIC ENGINE ---
+    // Loads saved credits from device storage, defaulting to 0 if it's a first-time setup
+    coins: parseInt(localStorage.getItem('farmSpaceCoins')) || 0,
+    xp: parseInt(localStorage.getItem('farmSpaceXP')) || 0,
+    unlockedCharacters: JSON.parse(localStorage.getItem('farmSpaceUnlockedChars')) || ['farmer'],
+    selectedCharacter: localStorage.getItem('farmSpaceSelectedChar') || 'farmer',
+    
+    // 🎯 PERSISTENT WEAPON UNLOCK REGISTER: Safely binds your shop purchases to active runtime memory
+    selectedWeapon: localStorage.getItem('farmSpaceSelectedWeapon') || null,
+    
+    playerSpeedModifier: parseFloat(localStorage.getItem('farmSpaceSpeedMod')) || 1.0,
     
     // --- ❤️ FARMER HEALTH SYSTEM ---
     playerHealth: 3,                             // The active structural life point counter
@@ -21,12 +33,12 @@ export const gameState = {
 
     // --- SPACE ROCKET FUEL MECHANICS ---
     rocketFuel: 0,                               // Current accumulated engine fuel points
-    maxRocketFuel: 500, 
+    maxRocketFuel: 500,
     isGameWon: false,                            // Peak storage container threshold cap
 
     // --- WEAPONS, PLOWING & HOTBAR SYSTEM ---
-    hasScythe: false, 
-    plowedPatches: [], 
+    hasScythe: false,
+    plowedPatches: [],
     scythes: [],
     inventory: [null, null, null, null, null],   // Slots 0-4 mapping to Hotkeys 1-5
     activeSlot: 0,                               // The currently selected index
@@ -38,11 +50,11 @@ export const gameState = {
     chickens: [], carryingChicken: null, chickensSaved: 0,
     spaceCows: [], carryingSpaceCow: null, spaceCowsSaved: 0,
     charms: [],
-    
+
     // --- MAP OBJECTS & THROWABLES ---
     enemies: [], seeds: [], plantedWatermelons: [], tires: [], guns: [],
     grenadesOnGround: [], activeGrenades: [], carryingGrenade: false,
-    
+
     // --- LOCAL MULTIPLAYER SYSTEM ---
     isMultiplayer: false,
     playerRole: 'farmer',                        // Can be 'farmer' or 'alien-master'
@@ -56,7 +68,7 @@ export const gameState = {
     highScore: localStorage.getItem('farmSpaceHighScore') || 0,
     pigHighScore: localStorage.getItem('farmSpacePigHighScore') || 0,
     chickenHighScore: localStorage.getItem('farmSpaceChickenHighScore') || 0,
-    
+
     spawnRateMultiplier: 1.0,
     corral: { x: 20, y: (CANVAS_HEIGHT / 2) - 150, width: 300, height: 300 }
 };
