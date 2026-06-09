@@ -2,8 +2,8 @@ import { gameState, ctx, CANVAS_WIDTH, CANVAS_HEIGHT } from './state.js';
 import { initInput } from './input.js';
 import { player } from './player.js';
 import { checkCollision, triggerGameOver } from './helpers.js';
-import { gameAudio, moveSound, shootSound, seedPickupSound, grenadeExplosionSound, tirePickupSound, watermelonPickupSound } from './audio.js';
-import { corralSprite, grenadeSprite, scytheSprite, serpentSword, seedSprite, tireSprite, ak47Idle, watermelonSprite, charmSprite } from './assets.js';
+import { gameAudio, moveSound, shootSound, seedPickupSound, grenadeExplosionSound, tirePickupSound, swordSwingingSound, watermelonPickupSound } from './audio.js';
+import { corralSprite, swingingSword, grenadeSprite, scytheSprite, serpentSword, seedSprite, tireSprite, ak47Idle, watermelonSprite, charmSprite } from './assets.js';
 import { initMultiplayer } from './network.js';
 // 🎯 MODULAR COMPONENTS INTERFACE IMPORTS
 import { updateAndDrawEnemies, createEnemyData } from './enemies.js';
@@ -36,7 +36,7 @@ setInterval(() => {
 function createDamageNumber(x, y, amount, isCritical = false, isVenom = false) {
     let textColor = isCritical ? '#ffd700' : '#00ffff'; // Gold for crit/coins/XP, Cyan for base
     if (isVenom) textColor = '#22c55e'; // 🎯 Venomous Green for sword strikes!
-    
+
     gameState.damageNumbers.push({
         x: x + Math.random() * 60 - 30,
         y: y - 10,
@@ -125,7 +125,7 @@ export function resetGameSession() {
     gameState.hasGun = false;
     gameState.gunCoolDownActive = false;
     gameState.killsSinceEmpty = 0;
-    
+
     // Reset sword cooldown states
     gameState.swordDurability = gameState.maxSwordDurability;
     gameState.swordCooldownActive = false;
@@ -271,7 +271,7 @@ function gameLoop() {
             ctx.drawImage(scytheSprite, boxX + 10, startY + 10, boxSize - 20, boxSize - 20);
         } else if (item === 'gun') {
             ctx.drawImage(ak47Idle, boxX + 5, startY + 5, boxSize - 10, boxSize - 10);
-        } 
+        }
         // 🎯🪐 SERPENT SWORD HUD SLOT DRAW ROUTINE
         else if (item === 'serpent_sword' || (gameState.selectedWeapon === 'serpent_sword' && j === 1)) {
             // Only draw visual item thumbnail if it's not currently charging/shattered
@@ -284,7 +284,7 @@ function gameLoop() {
                 let remaining = Math.max(0, Math.ceil((gameState.swordCooldownTimer - Date.now()) / 1000));
                 ctx.fillText(`${remaining}s`, boxX + (boxSize / 2), startY + (boxSize / 2) + 6);
             }
-            
+
             if (gameState.inventory[1] !== 'serpent_sword') {
                 gameState.inventory[1] = 'serpent_sword';
             }
@@ -338,7 +338,7 @@ function gameLoop() {
     if (gameState.isPowered && Date.now() - gameState.powerTimer > 10000) gameState.isPowered = false;
     let baseSpeed = gameState.isPowered ? 12 : 6;
     let speed = baseSpeed * (gameState.playerSpeedModifier || 1.0);
-    
+
     if (gameState.moveLeft) gameState.playerX -= speed; if (gameState.moveRight) gameState.playerX += speed;
     if (gameState.moveUp) gameState.playerY -= speed; if (gameState.moveDown) gameState.playerY += speed;
     gameState.playerX = Math.max(0, Math.min(CANVAS_WIDTH - 288, gameState.playerX));
@@ -498,13 +498,13 @@ function gameLoop() {
         if (checkCollision(player, { x: charm.x, y: charm.y, width: charm.width, height: charm.height }, true)) {
             gameState.charms.splice(i, 1);
             seedPickupSound.play().catch(() => { });
-            
+
             // 🎯 EXPERIENCE REWARD ASSIGNMENT
             gameState.enemyKillScore += 5;
-            gameState.xp = (gameState.xp || 0) + 25; 
-            
+            gameState.xp = (gameState.xp || 0) + 25;
+
             localStorage.setItem('farmSpaceXP', gameState.xp);
-            
+
             createDamageNumber(charm.x + 60, charm.y, "+25 XP", true);
         }
     });
@@ -602,12 +602,12 @@ function gameLoop() {
         ctx.fillStyle = 'white'; ctx.fillText("SCYTHE:", 30, 135); ctx.fillStyle = 'black'; ctx.fillRect(210, 110, 200, 30);
         let durPct = gameState.scytheDurability / gameState.maxScytheDurability; ctx.fillStyle = durPct > 0.35 ? '#00bfff' : '#FFaa00'; ctx.fillRect(210, 110, 200 * durPct, 30);
     }
-    
+
     // 🎯 SERPENT SWORD DURABILITY HUD METER BAR
     let activeWeapon = gameState.inventory[gameState.activeSlot];
     if (activeWeapon === 'serpent_sword' || (gameState.selectedWeapon === 'serpent_sword' && gameState.activeSlot === 1)) {
         ctx.fillStyle = '#22c55e'; ctx.fillText("SWORD:", 30, 210); ctx.fillStyle = 'black'; ctx.fillRect(210, 185, 200, 30);
-        
+
         if (gameState.swordCooldownActive) {
             // Visual text alert showing reload loop directly over empty meter bar
             let remaining = Math.max(0, Math.ceil((gameState.swordCooldownTimer - Date.now()) / 1000));
@@ -769,7 +769,7 @@ document.addEventListener('DOMContentLoaded', () => {
         startTrackingIntervals();
         gameLoop();
     }
-    
+
     if (startButton) {
         startButton.addEventListener('click', startGame);
     }
@@ -802,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function openCantina() {
         gameState.isPaused = true;
         if (shopScreen) shopScreen.style.display = 'block';
-        
+
         // 🎯 REAL-TIME LINK: Automatically loads and synchronizes your wallet totals to the shop UI layout card elements
         renderShop();
     }
@@ -846,12 +846,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Set up the universal keyboard hooks
+    // Setup the universal keyboard hooks
     window.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
             startGame();
         }
-        
+
         // 🎯 FIXED RESET LOOP: Listens to [R] but keeps wallet data safe
         if (e.key === 'r' || e.key === 'R' || e.keyCode === 82) {
             if (gameState.isGameOver || gameState.isGameWon) {
@@ -863,66 +863,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 resetGameSession();
             }
         }
-        
+
         // =======================================================
         // 🎯🪐 SERPENT SWORD ATTACK DRIVER [ S KEY ]
         // =======================================================
         if ((e.key === 's' || e.key === 'S' || e.keyCode === 83) && !gameState.isPaused && !gameState.isGameOver) {
             let activeWeapon = gameState.inventory[gameState.activeSlot];
             if ((activeWeapon === 'serpent_sword' || (gameState.selectedWeapon === 'serpent_sword' && gameState.activeSlot === 1)) && gameState.playerRole === 'farmer') {
-                
-                // Block attack if blade has shattered and is recharging
-                if (gameState.swordCooldownActive || (gameState.swordDurability || 0) <= 0) {
-                    console.log("💥 Sword is broken! Materializing... please wait.");
+
+                // Block attack if blade has shattered, is recharging, or is currently in the middle of a swing animation
+                if (gameState.swordCooldownActive || (gameState.swordDurability || 0) <= 0 || gameState.isSwordSwinging) {
                     return;
                 }
-                
-                gameState.enemies.forEach(en => {
-                    if (en.isDying) return;
-                    
-                    let distance = Math.hypot((en.x + 144) - (gameState.playerX + 144), (en.y + 144) - (gameState.playerY + 144));
-                    if (distance < 260) {
-                        let deltaX = en.x - gameState.playerX;
-                        if ((player.facingRight && deltaX > -50) || (!player.facingRight && deltaX < 50)) {
-                            if (!en.lastSwordStrikeTime) en.lastSwordStrikeTime = 0;
-                            if (Date.now() - en.lastSwordStrikeTime > 250) {
-                                let isMultiplayerBoss = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
-                                if (en.health === undefined) en.health = isMultiplayerBoss ? 50 : 10;
-                                
-                                let slashDamage = 3.5; 
-                                en.health -= slashDamage;
-                                en.lastSwordStrikeTime = Date.now();
-                                
-                                createDamageNumber(en.x + 144, en.y, `-${slashDamage} HP`, false, true);
-                                
-                                if (en.health <= 0) {
-                                    en.isDying = true; en.deathFrame = 0; en.deathTimer = 0; gameState.enemyKillScore++;
-                                    if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++;
-                                }
-                            }
-                        }
-                    }
-                });
-                
-                // Deduct durability point per swing attempt
+
+                // 🎯 TRIGGER 4-FRAME SPRITE SHEET CYCLE
+                gameState.isSwordSwinging = true;
+                gameState.swordAnimFrame = 0;
+                gameState.swordAnimTimer = 0;
+
+                // 🎯 AUDIO INTERCEPT HOOK
+                try {
+                    swordSwingingSound.currentTime = 0;
+                    swordSwingingSound.play().catch(err => console.log("Audio playback choked:", err));
+                } catch (audioErr) {
+                    console.warn("Could not fire sword audio asset track:", audioErr);
+                }
+
+                // Deduct durability
                 gameState.swordDurability--;
                 if (gameState.swordDurability <= 0) {
                     gameState.swordDurability = 0;
-                    
-                    // 🎯 START THE 15-SECOND COOLDOWN WINDOW INSTEAD OF SHATTERING OUTRIGHT!
                     gameState.swordCooldownActive = true;
-                    gameState.swordCooldownTimer = Date.now() + 15000; 
-                    console.log("💥 Serpent Sword shattered! Commencing 15s materialization warp...");
+                    gameState.swordCooldownTimer = Date.now() + 15000;
+                    console.log("💥 Serpent Sword shattered!");
                 }
             }
-        }
-
+        } // <--- END OF S KEY BLOCK. Ensure no damage logic follows this bracket!
         // 🎯 OPERATIONAL [H] KEY ROUTER: Navigates cleanly back to start screens and restores menu buttons
         if (e.key === 'h' || e.key === 'H' || e.keyCode === 72) {
             if (gameState.isGameOver || gameState.isGameWon) {
                 console.log("🏠 H Key home menu route triggered safely.");
                 if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-                
+
                 // 1. Tear down active intervals on screen to avoid execution bleeding
                 gameIntervals.forEach(clearInterval);
                 gameIntervals = [];
@@ -943,8 +925,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 4. FIX START MENU CONTENT ALIGNMENT: Reset styles on the main panel and child inputs
                 if (startScreen) {
-                    startScreen.style.display = ''; 
-                    
+                    startScreen.style.display = '';
+
                     // Reset styling on child elements to ensure the form components don't shift positions
                     const startBtn = document.getElementById('start-button');
                     if (startBtn) startBtn.style.display = '';
@@ -953,18 +935,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     const hostBtn = document.getElementById('host-farmer-btn');
                     const joinBtn = document.getElementById('join-master-btn');
                     const codeInput = document.getElementById('room-code-input');
-                    
+
                     if (hostBtn) hostBtn.style.display = '';
                     if (joinBtn) joinBtn.style.display = '';
                     if (codeInput) codeInput.style.display = '';
                 }
 
                 // 5. Restore top navigation buttons
-                if (openShopBtn) openShopBtn.style.display = ''; 
-                
+                if (openShopBtn) openShopBtn.style.display = '';
+
                 document.querySelectorAll('button, div, p, a').forEach(el => {
                     if (el.innerText && el.innerText.toLowerCase().includes('how to play')) {
-                        el.style.display = ''; 
+                        el.style.display = '';
                     }
                 });
 
@@ -973,11 +955,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const floatingTitle = document.getElementById('game-title') || document.getElementById('main-header');
                 if (floatingTitle) floatingTitle.style.display = '';
-                
+
                 // 6. Freeze game ticks safely and reset state
                 gameState.isGameOver = false;
                 gameState.isGameWon = false;
-                gameState.isPaused = true; 
+                gameState.isPaused = true;
+            }
+        }
+    });
+});
+
+// 🎯 ANIMATION COUPLING PASS: Listens to the impact trigger dispatched from player.js mid-swing frame
+window.addEventListener('sword-slice-impact', () => {
+    if (gameState.isPaused || gameState.isGameOver) return;
+
+    gameState.enemies.forEach(en => {
+        if (en.isDying) return;
+
+        let distance = Math.hypot((en.x + 144) - (gameState.playerX + 144), (en.y + 144) - (gameState.playerY + 144));
+        if (distance < 280) { // Wider slash-sheet sweeping range
+            let deltaX = en.x - gameState.playerX;
+            if ((player.facingRight && deltaX > -60) || (!player.facingRight && deltaX < 60)) {
+
+                let isMultiplayerBoss = (gameState.isMultiplayer && gameState.controlledEnemyId === en.id);
+                if (en.health === undefined) en.health = isMultiplayerBoss ? 50 : 10;
+
+                let slashDamage = 3.5; // Custom high-tier melee impact points
+                en.health -= slashDamage;
+
+                createDamageNumber(en.x + 144, en.y, `-${slashDamage} HP`, false, true);
+
+                if (en.health <= 0) {
+                    en.isDying = true;
+                    en.deathFrame = 0;
+                    en.deathTimer = 0;
+                    gameState.enemyKillScore++;
+                    if (gameState.gunCoolDownActive) gameState.killsSinceEmpty++;
+                }
             }
         }
     });

@@ -26,3 +26,6 @@ chickenPickupSound.volume = 0.4;
 
 export const grenadeExplosionSound = new Audio('assets/grenade-explosion.mp3');
 grenadeExplosionSound.volume = 0.6;
+
+export const swordSwingingSound = new Audio('assets/swordswinging.mp3');
+swordSwingingSound.volume = 0.5;

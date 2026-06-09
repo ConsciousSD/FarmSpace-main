@@ -37,3 +37,6 @@ window.poltra_with_gun = poltra_with_gun;
 window.lazer_bullet = lazer_bullet;
 export const serpentSword = new Image();
 serpentSword.src = 'assets/serpentsword.png';
+// Add this at the bottom of assets.js
+export const swingingSword = new Image();
+swingingSword.src = 'assets/swingingSword.png';

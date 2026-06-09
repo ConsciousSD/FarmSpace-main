@@ -1,5 +1,5 @@
 import { gameState } from './state.js';
-import { playerImage, tractorSprite, ak47Shooting, ak47Idle, scytheSprite, serpentSword } from './assets.js';
+import { playerImage, tractorSprite, ak47Shooting, ak47Idle, scytheSprite, serpentSword, swingingSword } from './assets.js';
 
 export const player = {
     width: 288,
@@ -55,23 +55,60 @@ export const player = {
             );
             ctx.restore();
 
+
             // --- 2. WEAPON RENDER SYSTEM ---
-            // 🎯 LINKED: Checks the active tool array or if the item is explicitly chosen via the Space Cantina
             let currentItem = gameState.inventory[gameState.activeSlot];
 
-            // 🎯 COOLDOWN HIDE CHECK: Added !gameState.swordCooldownActive so the blade vanishes while recharging!
+            // 🎯 COOLDOWN HIDE CHECK: Sword vanishes completely from frame layers if weapon is shattered/recharging
             if ((currentItem === 'serpent_sword' || (gameState.selectedWeapon === 'serpent_sword' && gameState.activeSlot === 1)) && !gameState.swordCooldownActive) {
                 ctx.save();
 
-                // 🎯 POSITION SHIFT FIX: Moves the sword horizontally to the side of his body frame instead of dead center
+                // Position offset variables shift weapon placement horizontally to the side of the body
                 let weaponXOffset = this.facingRight ? 190 : 90;
                 ctx.translate(this.x + weaponXOffset, this.y + 160 + (checksMoving ? Math.sin(gameState.gameFrame * 0.2) * 5 : 0));
 
-                // Mirror tool alignment alongside your base character flip logic
-                if (this.facingRight) ctx.scale(-1, 1);
+                // 🎯 DIRECTION FLIP FIX: Render base frames standard left-to-right, flip horizontally ONLY when moving left!
+                if (!this.facingRight) {
+                    ctx.scale(-1, 1);
+                }
 
-                // Draws your custom legendary serpent blade texture layer over the arm coordinates
-                ctx.drawImage(serpentSword, -100, -100, 200, 200);
+                // 🎯 SPRITE SHEET INTERACTION ANIMATOR ROUTINE
+                if (gameState.isSwordSwinging) {
+                    // Update animation trackers (stagger frame steps every 4 frames)
+                    gameState.swordAnimTimer++;
+                    if (gameState.swordAnimTimer >= 4) {
+                        gameState.swordAnimFrame++;
+                        gameState.swordAnimTimer = 0;
+
+                        // Melee cutting logic intercept executes precisely on frame 2 of arc swing
+                        if (gameState.swordAnimFrame === 2) {
+                            window.dispatchEvent(new CustomEvent('sword-slice-impact'));
+                        }
+
+                        // Kill swing sequence loop once frame sheet reaches boundary ceiling
+                        if (gameState.swordAnimFrame >= 4) {
+                            gameState.isSwordSwinging = false;
+                            gameState.swordAnimFrame = 0;
+                        }
+                    }
+
+                    // Split the 2048px width columns out into neat 512x512 canvas cells
+                    let frameWidth = 512;
+                    let sourceX = gameState.swordAnimFrame * frameWidth;
+
+                    ctx.drawImage(
+                        swingingSword,
+                        sourceX, 0,          // Source clip bounding starts (X, Y)
+                        frameWidth, 512,     // Source bounding size card variables
+                        -150, -150,          // Destination offset centers block directly onto arm coordinates
+                        300, 300             // Render scaling size on field layer
+                    );
+
+                } else {
+                    // Default idle weapon rendering posture if player isn't actively slashing
+                    ctx.drawImage(serpentSword, -100, -100, 200, 200);
+                }
+
                 ctx.restore();
             }
             else if (gameState.hasGun) {
