@@ -627,7 +627,7 @@ function startTrackingIntervals() {
 
 // 🌐 LIVE INTERNET VERSION ASYNC CHECK ENGINE
 export function checkForUpdates() {
-    const currentVersion = "1.0.0"; // Matches your hardcoded app snapshot version
+    const currentVersion = "1.0.1"; // Matches your hardcoded app snapshot version
     const versionUrl = "https://conscioussd.github.io/FarmSpace-main/version.txt";
     // 🎯 ADD THIS LINE HERE: Dynamically writes the current version onto the menu screen
     const versionDisplay = document.getElementById('version-display');
