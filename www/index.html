@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    
     <title>Farm Space</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -18,7 +21,6 @@
     
     <div id="start-screen">
         <h1>Farm Space</h1>
-        
         <span id="version-display" class="menu-version-text">v1.0.1</span>
         
         <div id="menu-alert-box" class="hidden-banner">
@@ -40,7 +42,6 @@
     </div>
 
     <div id="shop-screen">
-        
         <h1 class="cantina-title">🛸 THE SPACE CANTINA 🌾</h1>
         <p class="cantina-subtitle">Secure Galactic Trade Terminal</p>
         
@@ -54,8 +55,7 @@
             <button class="shop-tab-btn" id="tab-powerup-btn">POWER-UPS</button>
         </div>
 
-        <div id="shop-items-container">
-            </div>
+        <div id="shop-items-container"></div>
 
         <br><br>
         <button id="close-shop-btn">Return to Field</button>
@@ -74,30 +74,24 @@
                     <li><span class="key">1</span> - <span class="key">5</span> Select Hotbar Inventory Slots</li>
                     <li><span class="key">Arrows</span> Move your Farmer</li>
                     <li><span class="key">A</span> Swing Scythe (Plow ground)</li>
-                    <li><span class="key">Spacebar</span> Plant Watermelon Seed (Must stand on Plowed Dirt)</li>
-                    <li><span class="key">S</span> Fire Equipped AK-47 Weapon</li>
+                    <li><span class="key">Spacebar</span> Plant Watermelon Seed</li>
+                    <li><span class="key">S</span> Fire Equipped Weapon</li>
                     <li><span class="key">D</span> Interact: Grab/Drop Animals & Pick up/Throw Grenades</li>
                     <li><span class="key">P</span> Pause / Unpause Game</li>
                 </ul>
 
                 <hr>
-
                 <h3>🌾 Core Game Loop</h3>
                 <ol class="loop-steps">
                     <li><strong>Plow:</strong> Equip your Scythe and press <strong>[A]</strong> to make rich brown soil patches.</li>
                     <li><strong>Plant:</strong> Walk over the patch and press <strong>[Spacebar]</strong> to plant a crop.</li>
-                    <li><strong>Harvest & Defend:</strong> When the watermelon is fully grown, walk over it to harvest it. It will automatically shoot down the nearest alien threat!</li>
-                    <li><strong>Rescue Animals:</strong> Pick up Space Pigs/Chickens with <strong>[D]</strong> and bring them to the corral. They spawn floating <strong>Charms (+5 Score)</strong> as a reward!</li>
+                    <li><strong>Harvest:</strong> Harvest fully grown watermelons to shoot down aliens.</li>
+                    <li><strong>Rescue:</strong> Pick up Space Pigs/Chickens with <strong>[D]</strong>.</li>
                 </ol>
-                
-                <hr>
-                
-                <h3>📦 Supply Drops & Tractors</h3>
-                <p class="manual-text">Score kills to trigger crates. Grab <strong>Tractor Wheels</strong> to gain speed and temporary invincibility, running over aliens instantly for 10 seconds!</p>
             </div>
         </div>
     </div>
-  
+ 
     <script type="module" src="js/main.js"></script>
 </body>
 </html>

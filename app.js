@@ -18,7 +18,7 @@ function createWindow() {
   win.webContents.openDevTools();
 
   // Loads your game's HTML frontend layout
-  win.loadFile('index.html');
+  win.loadFile('www/index.html');
 }
 
 // Bootstraps Electron to launch the window container once initialization is stable
